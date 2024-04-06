@@ -98,11 +98,11 @@ if __name__ == "__main__":
         learning_rate=1e-5,
         weight_decay=1e-1,
         logging_steps=50,
-        eval_steps=500,
+        eval_steps=100,
         # bf16=True,
         report_to="wandb",
         load_best_model_at_end=True,
-        save_steps=500,
+        save_steps=100,
         save_total_limit=3,
         remove_unused_columns=True,
     )
