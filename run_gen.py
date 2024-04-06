@@ -69,7 +69,8 @@ if __name__ == "__main__":
 
     dataset = load_from_disk(DATASET_PATH)
     model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME,
-                                                       torch_dtype=torch.bfloat16)
+                                                       # torch_dtype=torch.bfloat16
+                                                       )
 
     training_args = TrainingArguments(
         output_dir=f"ckpts/{run_name}",
@@ -86,7 +87,7 @@ if __name__ == "__main__":
         weight_decay=1e-1,
         logging_steps=20,
         eval_steps=20,
-        bf16=True,
+        # bf16=True,
         report_to="wandb",
         load_best_model_at_end=True,
         save_steps=20,
