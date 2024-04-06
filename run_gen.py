@@ -43,7 +43,7 @@ tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME,
                                           truncation=True)
 HEAD = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C) "
         "from 0 to 12 based on the provided demographics and comorbidity data:\n")
-TAIL = "### AUDIT-C Score: "
+TAIL = "\n### AUDIT-C Score: \n"
 
 collator = DataCollatorForCompletionOnlyLM(TAIL, tokenizer=tokenizer)
 
