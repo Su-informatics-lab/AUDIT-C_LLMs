@@ -61,7 +61,8 @@ def formatting_func(example: DatasetDict) -> List[str]:
         body = (f"Gender={example['gender'][i]},\nRace={example['race'][i]},"
                 f"\nEthnicity={example['ethnicity'][i]},\nAge={example['age'][i]},"
                 f"\nComorbidity={example['comorbidity'][i]}\n")
-        output_texts.append(HEAD + body + TAIL)
+        score = ["audit.c.score"][i]
+        output_texts.append(HEAD + body + TAIL + score)
 
     return output_texts
 
