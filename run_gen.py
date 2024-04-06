@@ -75,7 +75,7 @@ if __name__ == "__main__":
     training_args = TrainingArguments(
         output_dir=f"ckpts/{run_name}",
         overwrite_output_dir=False,
-        num_train_epochs=10.0,
+        num_train_epochs=50.0,
         do_train=True,
         do_eval=True,
         do_predict=True,
@@ -85,12 +85,12 @@ if __name__ == "__main__":
         gradient_accumulation_steps=4,
         learning_rate=3e-4,
         weight_decay=1e-1,
-        logging_steps=20,
-        eval_steps=20,
+        logging_steps=100,
+        eval_steps=1000,
         # bf16=True,
         report_to="wandb",
         load_best_model_at_end=True,
-        save_steps=20,
+        save_steps=1000,
         save_total_limit=3,
         remove_unused_columns=True,
     )
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     trainer = SFTTrainer(
         model,
         train_dataset=dataset["train"],
-        eval_dataset=dataset["val"],
+        eval_dataset=dataset["val"].select(range(200)),  # fixme: can be a bad choice
         formatting_func=formatting_func,
         # fixme
         max_seq_length=256,
