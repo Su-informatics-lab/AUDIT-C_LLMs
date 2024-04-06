@@ -51,24 +51,25 @@ def formatting_func(example: DatasetDict) -> List[str]:
         A list of formatted strings ready for model training.
     """
     output_texts = []
-    head = "### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C) from 0 to 12 based on the provided demographics and comorbidity data:\n"
+    head = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C) "
+            "from 0 to 12 based on the provided demographics and comorbidity data:\n")
     tail = "### AUDIT-C Score:\n"
 
-
     for i in range(len(example["audit.c.score"])):
-        body = f"Gender={example['gender'][i]},\nRace={example['race'][i]},\nEthnicity={example['ethnicity'][i]},\nAge={example['age'][i]},\nComorbidity={example['comorbidity'][i]}\n"
+        body = (f"Gender={example['gender'][i]},\nRace={example['race'][i]},"
+                f"\nEthnicity={example['ethnicity'][i]},\nAge={example['age'][i]},"
+                f"\nComorbidity={example['comorbidity'][i]}\n")
         output_texts.append(head + body + tail)
 
     return output_texts
 
 
 if __name__ == "__main__":
-
     torch.manual_seed(SEED + 21)
 
     dataset = load_from_disk(DATASET_PATH)
-    model = AutoModelForCausalLM.from_pretrained(MODEL_NAME,
-                                                 torch_dtype=torch.bfloat16)
+    model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME,
+                                                       torch_dtype=torch.bfloat16)
 
     training_args = TrainingArguments(
         output_dir=f"ckpts/{run_name}",
