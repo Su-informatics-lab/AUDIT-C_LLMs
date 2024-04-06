@@ -103,7 +103,7 @@ if __name__ == "__main__":
         train_dataset=dataset["train"],
         eval_dataset=dataset["val"].select(range(200)),  # fixme: can be a bad choice
         formatting_func=formatting_func,
-        collator=collator,
+        data_collator=collator,
         # fixme
         max_seq_length=256,
         args=training_args,
