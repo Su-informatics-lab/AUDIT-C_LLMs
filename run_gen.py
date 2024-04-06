@@ -16,6 +16,7 @@ We will be using six of the fields, specifically:
 - Predicted var:
     - 'audit.c.score'
 
+191,127 samples are for training
 """
 
 __author__ = "hw56@indiana.edu"
@@ -106,7 +107,7 @@ if __name__ == "__main__":
         formatting_func=formatting_func,
         data_collator=collator,
         # fixme
-        max_seq_length=1,  # a score
+        max_seq_length=4,  # a score
         args=training_args,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
