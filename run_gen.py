@@ -37,7 +37,10 @@ from utils import DATASET_PATH, MODEL_NAME, PROJECT_NAME, SEED
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 run_name = f'sft_generation_{MODEL_NAME.split("/")[-1]}'
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, padding_side="right")
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME,
+                                          max_length=128,
+                                          padding_side="right",
+                                          truncation=True)
 HEAD = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C) "
         "from 0 to 12 based on the provided demographics and comorbidity data:\n")
 TAIL = "### AUDIT-C Score:\n"
@@ -84,17 +87,18 @@ if __name__ == "__main__":
         do_eval=True,
         do_predict=True,
         evaluation_strategy="steps",
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
+        auto_find_batch_size=True,
+        # per_device_train_batch_size=16,
+        # per_device_eval_batch_size=16,
         gradient_accumulation_steps=4,
         learning_rate=3e-4,
         weight_decay=1e-1,
-        logging_steps=100,
-        eval_steps=1000,
+        logging_steps=50,
+        eval_steps=500,
         # bf16=True,
         report_to="wandb",
         load_best_model_at_end=True,
-        save_steps=1000,
+        save_steps=500,
         save_total_limit=3,
         remove_unused_columns=True,
     )
@@ -106,7 +110,7 @@ if __name__ == "__main__":
         eval_dataset=dataset["val"],
         formatting_func=formatting_func,
         data_collator=collator,
-        seq_length=4,  # a score
+        seq_length=128 + 4,  # input +
         args=training_args,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
