@@ -37,8 +37,10 @@ from utils import DATASET_PATH, MODEL_NAME, PROJECT_NAME, SEED
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 run_name = f'sft_generation_{MODEL_NAME.split("/")[-1]}'
+# fixme: 256 should be enough but not optimal
+MAX_LENGTH = 256
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME,
-                                          max_length=128,
+                                          max_length=MAX_LENGTH,
                                           padding_side="right",
                                           truncation=True)
 HEAD = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C) "
@@ -110,7 +112,7 @@ if __name__ == "__main__":
         eval_dataset=dataset["val"],
         formatting_func=formatting_func,
         data_collator=collator,
-        max_seq_length=128 + 4,  # input +
+        max_seq_length=MAX_LENGTH + 4,  # input_len + output_len
         args=training_args,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
