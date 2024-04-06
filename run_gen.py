@@ -29,8 +29,10 @@ from typing import List
 import torch
 import wandb
 from datasets import DatasetDict, load_from_disk
-from transformers import (T5ForConditionalGeneration, AutoTokenizer,
-                          EarlyStoppingCallback, TrainingArguments)
+from transformers import (T5ForConditionalGeneration,
+                          AutoTokenizer,
+                          EarlyStoppingCallback,
+                          TrainingArguments)
 from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 
 from utils import DATASET_PATH, MODEL_NAME, PROJECT_NAME, SEED
@@ -47,7 +49,7 @@ HEAD = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C
         "from 0 to 12 based on the provided demographics and comorbidity data:\n")
 TAIL = "\n### AUDIT-C Score:"
 
-collator = DataCollatorForCompletionOnlyLM(TAIL, tokenizer=tokenizer)
+# collator = DataCollatorForCompletionOnlyLM(TAIL, tokenizer=tokenizer)
 
 
 def formatting_func(example: DatasetDict) -> List[str]:
@@ -111,7 +113,7 @@ if __name__ == "__main__":
         train_dataset=dataset["train"],
         eval_dataset=dataset["val"],
         formatting_func=formatting_func,
-        data_collator=collator,
+        # data_collator=collator,
         max_seq_length=MAX_LENGTH + 4,  # input_len + output_len
         args=training_args,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
