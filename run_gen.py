@@ -16,7 +16,7 @@ We will be using six of the fields, specifically:
 - Predicted var:
     - 'audit.c.score'
 
-191,127 samples are for training
+206,864 samples are for training, 500 for val, and 5,000 for test.
 """
 
 __author__ = "hw56@indiana.edu"
@@ -84,8 +84,8 @@ if __name__ == "__main__":
         do_eval=True,
         do_predict=True,
         evaluation_strategy="steps",
-        per_device_train_batch_size=32,
-        per_device_eval_batch_size=32,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
         gradient_accumulation_steps=4,
         learning_rate=3e-4,
         weight_decay=1e-1,
@@ -103,11 +103,10 @@ if __name__ == "__main__":
     trainer = SFTTrainer(
         model,
         train_dataset=dataset["train"],
-        eval_dataset=dataset["val"].select(range(320)),  # fixme: can be a bad choice
+        eval_dataset=dataset["val"],
         formatting_func=formatting_func,
         data_collator=collator,
-        # fixme
-        max_seq_length=4,  # a score
+        max_seq_length=16,  # a score
         args=training_args,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
