@@ -110,7 +110,7 @@ if __name__ == "__main__":
         eval_dataset=dataset["val"],
         formatting_func=formatting_func,
         data_collator=collator,
-        seq_length=128 + 4,  # input +
+        max_seq_length=128 + 4,  # input +
         args=training_args,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
