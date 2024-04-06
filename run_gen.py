@@ -106,7 +106,7 @@ if __name__ == "__main__":
         eval_dataset=dataset["val"],
         formatting_func=formatting_func,
         data_collator=collator,
-        max_seq_length=128,  # a score
+        seq_length=4,  # a score
         args=training_args,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
