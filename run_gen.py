@@ -43,7 +43,7 @@ tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME,
                                           truncation=True)
 HEAD = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C) "
         "from 0 to 12 based on the provided demographics and comorbidity data:\n")
-TAIL = "\n### AUDIT-C Score: \n"
+TAIL = "\n### AUDIT-C Score:"
 
 collator = DataCollatorForCompletionOnlyLM(TAIL, tokenizer=tokenizer)
 
@@ -66,7 +66,7 @@ def formatting_func(example: DatasetDict) -> List[str]:
                 f"\nEthnicity={example['ethnicity'][i]},\nAge={example['age'][i]},"
                 f"\nComorbidity={example['comorbidity'][i]}\n")
         score = str(example["audit.c.score"][i])
-        output_texts.append(HEAD + body + TAIL + score)
+        output_texts.append(HEAD + body + TAIL + ' ' + score)
 
     return output_texts
 
