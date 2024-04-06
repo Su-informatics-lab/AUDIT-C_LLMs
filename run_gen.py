@@ -28,7 +28,7 @@ from typing import List
 import torch
 import wandb
 from datasets import DatasetDict, load_from_disk
-from transformers import (AutoModelForCausalLM, AutoTokenizer,
+from transformers import (T5ForConditionalGeneration, AutoTokenizer,
                           EarlyStoppingCallback, TrainingArguments)
 from trl import SFTTrainer
 
