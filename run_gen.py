@@ -30,13 +30,18 @@ import wandb
 from datasets import DatasetDict, load_from_disk
 from transformers import (T5ForConditionalGeneration, AutoTokenizer,
                           EarlyStoppingCallback, TrainingArguments)
-from trl import SFTTrainer
+from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 
 from utils import DATASET_PATH, MODEL_NAME, PROJECT_NAME, SEED
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 run_name = f'sft_generation_{MODEL_NAME.split("/")[-1]}'
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, padding_side="right")
+HEAD = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C) "
+        "from 0 to 12 based on the provided demographics and comorbidity data:\n")
+TAIL = "### AUDIT-C Score:\n"
+
+collator = DataCollatorForCompletionOnlyLM(TAIL, tokenizer=tokenizer)
 
 
 def formatting_func(example: DatasetDict) -> List[str]:
@@ -51,15 +56,12 @@ def formatting_func(example: DatasetDict) -> List[str]:
         A list of formatted strings ready for model training.
     """
     output_texts = []
-    head = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C) "
-            "from 0 to 12 based on the provided demographics and comorbidity data:\n")
-    tail = "### AUDIT-C Score:\n"
 
     for i in range(len(example["audit.c.score"])):
         body = (f"Gender={example['gender'][i]},\nRace={example['race'][i]},"
                 f"\nEthnicity={example['ethnicity'][i]},\nAge={example['age'][i]},"
                 f"\nComorbidity={example['comorbidity'][i]}\n")
-        output_texts.append(head + body + tail)
+        output_texts.append(HEAD + body + TAIL)
 
     return output_texts
 
@@ -101,6 +103,7 @@ if __name__ == "__main__":
         train_dataset=dataset["train"],
         eval_dataset=dataset["val"].select(range(200)),  # fixme: can be a bad choice
         formatting_func=formatting_func,
+        collator=collator,
         # fixme
         max_seq_length=256,
         args=training_args,
