@@ -121,22 +121,22 @@ if __name__ == "__main__":
     dataset = load_from_disk(DATASET_PATH)
     model = T5EncoderForRegression.from_pretrained(MODEL_NAME)
 
+    # Corrected TrainingArguments without compute_metrics
     training_args = TrainingArguments(
         output_dir=f"ckpts/{run_name}",
         overwrite_output_dir=False,
         num_train_epochs=50.0,
-        compute_metrics=compute_metrics,
         do_train=True,
         do_eval=True,
         do_predict=True,
         evaluation_strategy="steps",
-        auto_find_batch_size=True,
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=4,
         gradient_accumulation_steps=4,
         learning_rate=1e-5,
         weight_decay=1e-1,
         logging_steps=50,
         eval_steps=500,
-        # bf16=True,
         report_to="wandb",
         load_best_model_at_end=True,
         save_steps=500,
@@ -145,14 +145,12 @@ if __name__ == "__main__":
     )
     wandb.init(project=PROJECT_NAME, name=run_name, config=training_args)
 
-    trainer = SFTTrainer(
-        model,
+    trainer = RegressionTrainer(
+        model=model,
+        args=training_args,
         train_dataset=dataset["train"],
         eval_dataset=dataset["val"],
-        formatting_func=formatting_func,
-        max_seq_length=MAX_LENGTH + 4,  # input_len + output_len
-        args=training_args,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+        compute_metrics=compute_metrics,
     )
 
     trainer.train()
