@@ -29,27 +29,19 @@ from typing import List
 import torch
 import wandb
 from datasets import DatasetDict, load_from_disk
-from transformers import (T5ForConditionalGeneration,
-                          AutoTokenizer,
-                          EarlyStoppingCallback,
-                          TrainingArguments)
-from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
+from transformers import (AutoTokenizer, EarlyStoppingCallback,
+                          T5ForConditionalGeneration, TrainingArguments)
+from trl import DataCollatorForCompletionOnlyLM, SFTTrainer
 
-from utils import DATASET_PATH, MODEL_NAME, PROJECT_NAME, SEED, MAX_OUTPUT_LENGTH
+from utils import (DATASET_PATH, HEAD, MAX_LENGTH, MAX_OUTPUT_LENGTH,
+                   MODEL_NAME, PROJECT_NAME, SEED, TAIL)
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 run_name = f'sft_generation_{MODEL_NAME.split("/")[-1]}'
 # fixme: 256 should be enough but not optimal
-MAX_LENGTH = 256
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME,
-                                          max_length=MAX_LENGTH,
-                                          padding_side="right",
-                                          truncation=True)
-HEAD = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C) "
-        "from 0 to 12 based on the provided demographics and comorbidity data:\n")
-TAIL = "\n### AUDIT-C Score:"
-
-# collator = DataCollatorForCompletionOnlyLM(TAIL, tokenizer=tokenizer)
+tokenizer = AutoTokenizer.from_pretrained(
+    MODEL_NAME, max_length=MAX_LENGTH, padding_side="right", truncation=True
+)
 
 
 def formatting_func(example: DatasetDict) -> List[str]:
@@ -66,11 +58,13 @@ def formatting_func(example: DatasetDict) -> List[str]:
     output_texts = []
 
     for i in range(len(example["audit.c.score"])):
-        body = (f"Gender={example['gender'][i]},\nRace={example['race'][i]},"
-                f"\nEthnicity={example['ethnicity'][i]},\nAge={example['age'][i]},"
-                f"\nComorbidity={example['comorbidity'][i]}\n")
+        body = (
+            f"Gender={example['gender'][i]},\nRace={example['race'][i]},"
+            f"\nEthnicity={example['ethnicity'][i]},\nAge={example['age'][i]},"
+            f"\nComorbidity={example['comorbidity'][i]}\n"
+        )
         score = str(example["audit.c.score"][i])
-        output_texts.append(HEAD + body + TAIL + ' ' + score)
+        output_texts.append(HEAD + body + TAIL + " " + score)
 
     return output_texts
 
@@ -79,9 +73,10 @@ if __name__ == "__main__":
     torch.manual_seed(SEED + 21)
 
     dataset = load_from_disk(DATASET_PATH)
-    model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME,
-                                                       # torch_dtype=torch.bfloat16
-                                                       )
+    model = T5ForConditionalGeneration.from_pretrained(
+        MODEL_NAME,
+        # torch_dtype=torch.bfloat16
+    )
 
     training_args = TrainingArguments(
         output_dir=f"ckpts/{run_name}",
@@ -92,10 +87,8 @@ if __name__ == "__main__":
         do_predict=True,
         evaluation_strategy="steps",
         auto_find_batch_size=True,
-        # per_device_train_batch_size=16,
-        # per_device_eval_batch_size=16,
-        gradient_accumulation_steps=1,
-        learning_rate=5e-6,
+        gradient_accumulation_steps=4,
+        learning_rate=1e-5,
         weight_decay=1e-1,
         logging_steps=50,
         eval_steps=100,
