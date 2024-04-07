@@ -35,7 +35,7 @@ from transformers import (T5ForConditionalGeneration,
                           TrainingArguments)
 from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 
-from utils import DATASET_PATH, MODEL_NAME, PROJECT_NAME, SEED
+from utils import DATASET_PATH, MODEL_NAME, PROJECT_NAME, SEED, MAX_OUTPUT_LENGTH
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 run_name = f'sft_generation_{MODEL_NAME.split("/")[-1]}'
@@ -114,7 +114,7 @@ if __name__ == "__main__":
         eval_dataset=dataset["val"],
         formatting_func=formatting_func,
         # data_collator=collator,
-        max_seq_length=MAX_LENGTH + 4,  # input_len + output_len
+        max_seq_length=MAX_LENGTH + MAX_OUTPUT_LENGTH,  # input_len + output_len
         args=training_args,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
