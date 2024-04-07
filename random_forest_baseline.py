@@ -7,11 +7,16 @@ from sklearn.metrics import accuracy_score, mean_squared_error
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
-from utils import DATASET_PATH
+from utils import DATASET_PATH, SEED
 
 dataset = load_from_disk(DATASET_PATH)
 # define preprocessing for categorical features (one-hot encoding)
 categorical_transformer = OneHotEncoder(handle_unknown="ignore")
+
+
+__author__ = "hw56@indiana.edu"
+__version__ = "0.0.1"
+__license__ = "0BSD"
 
 
 def convert_to_dataframe(dataset):
@@ -74,8 +79,12 @@ preprocessor = ColumnTransformer(
 
 
 rf_pipeline = Pipeline(
-    steps=[("preprocessor", preprocessor), ("regressor", RandomForestRegressor())]
+    steps=[
+        ("preprocessor", preprocessor),
+        ("regressor", RandomForestRegressor(random_state=SEED + 534))
+    ]
 )
+
 
 # fit the model
 rf_pipeline.fit(X_train, y_train)
@@ -84,7 +93,7 @@ rf_pipeline.fit(X_train, y_train)
 y_pred = rf_pipeline.predict(X_test)
 y_pred_rounded = np.round(y_pred)
 
-# Evaluate the model
+# evaluate the model
 mse = mean_squared_error(y_test, y_pred)
 accuracy = accuracy_score(y_test, y_pred_rounded)
 
