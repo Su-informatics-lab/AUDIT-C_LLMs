@@ -11,6 +11,11 @@ from transformers import AutoTokenizer, T5ForConditionalGeneration
 
 from utils import DATASET_PATH, HEAD, MAX_LENGTH, SEED, TAIL
 
+__author__ = "hw56@indiana.edu"
+__version__ = "0.0.1"
+__license__ = "0BSD"
+
+
 # fixme
 # val_loss=9.049*e-9 (lr=3e-5, grad_accumu=4, auto_bs, outputlen=4)
 BEST_FLANT5_CKPT = "ckpts/sft_generation_flan-t5-base/checkpoint-2400"
