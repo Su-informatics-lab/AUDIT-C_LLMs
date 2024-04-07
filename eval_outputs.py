@@ -107,7 +107,7 @@ def batch_generate_predictions(model, tokenizer, input_texts, batch_size=8):
         inputs = tokenizer(batch, return_tensors="pt", padding=True, truncation=True,
                            max_length=MAX_LENGTH).to(device)
         with torch.no_grad():  # No need to track gradients
-            outputs = model.generate(**inputs, max_length=MAX_OUTPUT_LENGTH)
+            outputs = model.generate(**inputs, max_length=MAX_LENGTH)
         batch_predictions = [tokenizer.decode(output, skip_special_tokens=True) for
                              output in outputs]
         predictions.extend(batch_predictions)
