@@ -1,20 +1,21 @@
 import numpy as np
 import torch
+from tqdm import tqdm
 from datasets import load_from_disk
 from sklearn.metrics import mean_squared_error
 from transformers import AutoTokenizer, T5ForConditionalGeneration
 
-from run_gen import HEAD, MAX_LENGTH, TAIL
-from utils import DATASET_PATH, MAX_OUTPUT_LENGTH, SEED
+from utils import DATASET_PATH, MAX_OUTPUT_LENGTH, SEED, HEAD, MAX_LENGTH, TAIL
 
 # val_loss=9.049*e-9 (lr=3e-5, grad_accumu=4, auto_bs)
-BEST_FLANT5_CKPT = "ckpts/sft_generation_flan-t5-base_lr3e-5/checkpoint-2400"
+BEST_FLANT5_CKPT = "ckpts/sft_generation_flan-t5-base_lr1e-5/checkpoint-2400"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def output2score(prediction):
 
-    score = int(prediction.strip())
+    # only reserve the token for score after TAIL (i.e., "\n### AUDIT-C Score:")
+    score = int(prediction.split((TAIL).strip())[-1].strip())
 
     assert 0 <= prediction <= 12
 
@@ -88,7 +89,7 @@ if __name__ == "__main__":
     true_scores = []
 
     # Assuming you have a 'test_dataset' loaded similarly to 'dataset["val"]'
-    for example in test_split:
+    for example in tqdm(range(test_split)):
         body = (
             f"Gender={example['gender']},\nRace={example['race']},"
             f"\nEthnicity={example['ethnicity']},\nAge={example['age']},"
