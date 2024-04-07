@@ -4,12 +4,23 @@ from tqdm import tqdm
 from datasets import load_from_disk
 from sklearn.metrics import mean_squared_error
 from transformers import AutoTokenizer, T5ForConditionalGeneration
+import json
+import os
+from pathlib import Path
 
 from utils import DATASET_PATH, MAX_OUTPUT_LENGTH, SEED, HEAD, MAX_LENGTH, TAIL
 
-# val_loss=9.049*e-9 (lr=3e-5, grad_accumu=4, auto_bs)
-BEST_FLANT5_CKPT = "ckpts/sft_generation_flan-t5-base_lr1e-5/checkpoint-2400"
+# fixme
+# val_loss=9.049*e-9 (lr=3e-5, grad_accumu=4, auto_bs, outputlen=4)
+BEST_FLANT5_CKPT = "ckpts/sft_generation_flan-t5-base/checkpoint-2400"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+result_dir = Path("results")
+result_dir.mkdir(exist_ok=True)
+result_filename = '_'.join(BEST_FLANT5_CKPT.split('/')[-2:])
+
+    # f"results_{ckpt_basename}.json"
+
+# Ensure the 'results' directory exists
 
 
 def output2score(prediction):
@@ -75,34 +86,97 @@ def evaluate_accuracy(true_scores, predicted_scores):
     return accuracy
 
 
+def batch_generate_predictions(model, tokenizer, input_texts, batch_size=8):
+    """
+    Generate predictions for a batch of input texts.
+
+    Args:
+        model: The trained T5 model.
+        tokenizer: Tokenizer for the T5 model.
+        input_texts (list of str): The list of input texts properly formatted for the model.
+        batch_size (int): Batch size for processing.
+
+    Returns:
+        List[str]: The list of model's predicted outputs as strings.
+    """
+    model.eval()  # Ensure model is in evaluation mode
+    predictions = []
+
+    for i in range(0, len(input_texts), batch_size):
+        batch = input_texts[i:i + batch_size]
+        inputs = tokenizer(batch, return_tensors="pt", padding=True, truncation=True,
+                           max_length=MAX_LENGTH).to(device)
+        with torch.no_grad():  # No need to track gradients
+            outputs = model.generate(**inputs, max_length=MAX_OUTPUT_LENGTH)
+        batch_predictions = [tokenizer.decode(output, skip_special_tokens=True) for
+                             output in outputs]
+        predictions.extend(batch_predictions)
+
+    return predictions
+
 if __name__ == "__main__":
 
+    # torch.manual_seed(SEED + 2177)
+    #
+    # test_split = load_from_disk(DATASET_PATH)["test"]
+    # # fixme
+    # model = T5ForConditionalGeneration.from_pretrained(BEST_FLANT5_CKPT).to(device)
+    # tokenizer = AutoTokenizer.from_pretrained(
+    #     BEST_FLANT5_CKPT, max_length=MAX_LENGTH, padding_side="right", truncation=True
+    # )
+    # predicted_scores = []
+    # true_scores = []
+    #
+    # # Assuming you have a 'test_dataset' loaded similarly to 'dataset["val"]'
+    # for example in tqdm(test_split):
+    #     body = (
+    #         f"Gender={example['gender']},\nRace={example['race']},"
+    #         f"\nEthnicity={example['ethnicity']},\nAge={example['age']},"
+    #         f"\nComorbidity={example['comorbidity']}\n"
+    #     )
+    #     prediction = generate_prediction(model, tokenizer, HEAD + body + TAIL + " ")
+    #     score = output2score(prediction)
+    #     predicted_scores.append(score)
+    #     true_scores.append(example["audit.c.score"])
+    #
+    # # evaluate MSE and Acc
+    # mse = evaluate_mse(true_scores, predicted_scores)
+    # accuracy = evaluate_accuracy(true_scores, predicted_scores)
     torch.manual_seed(SEED + 2177)
-
     test_split = load_from_disk(DATASET_PATH)["test"]
-    # fixme
     model = T5ForConditionalGeneration.from_pretrained(BEST_FLANT5_CKPT).to(device)
-    tokenizer = AutoTokenizer.from_pretrained(
-        BEST_FLANT5_CKPT, max_length=MAX_LENGTH, padding_side="right", truncation=True
-    )
-    predicted_scores = []
-    true_scores = []
+    tokenizer = AutoTokenizer.from_pretrained(BEST_FLANT5_CKPT, max_length=MAX_LENGTH,
+                                              padding_side="right", truncation=True)
 
-    # Assuming you have a 'test_dataset' loaded similarly to 'dataset["val"]'
-    for example in tqdm(test_split):
-        body = (
-            f"Gender={example['gender']},\nRace={example['race']},"
-            f"\nEthnicity={example['ethnicity']},\nAge={example['age']},"
-            f"\nComorbidity={example['comorbidity']}\n"
-        )
-        prediction = generate_prediction(model, tokenizer, HEAD + body + TAIL + " ")
-        score = output2score(prediction)
-        predicted_scores.append(score)
-        true_scores.append(example["audit.c.score"])
+    # Prepare the input texts for batch processing
+    input_texts = [
+        HEAD + f"Gender={example['gender']},\nRace={example['race']},\nEthnicity={example['ethnicity']},\nAge={example['age']},\nComorbidity={example['comorbidity']}\n" + TAIL + " "
+        for example in test_split
+    ]
 
-    # evaluate MSE and Acc
+    # Generate predictions in batches
+    batch_predictions = batch_generate_predictions(model, tokenizer, input_texts,
+                                                   batch_size=8)
+
+    # Convert predictions to scores
+    predicted_scores = [output2score(pred) for pred in batch_predictions]
+    true_scores = [example["audit.c.score"] for example in test_split]
+
+    # Evaluate MSE and Accuracy
     mse = evaluate_mse(true_scores, predicted_scores)
     accuracy = evaluate_accuracy(true_scores, predicted_scores)
-
     print(f"MSE: {mse}")
     print(f"Accuracy: {accuracy}")
+
+    # saving
+    results_data = {
+        "mse": mse,
+        "accuracy": accuracy,
+        "predicted_scores": predicted_scores,
+        "true_scores": true_scores
+    }
+    results_path = os.path.join(result_dir, result_filename)
+    with open(results_path, "w") as json_file:
+        json.dump(results_data, json_file, indent=4)
+
+    print(f"Results saved to {results_path}")
