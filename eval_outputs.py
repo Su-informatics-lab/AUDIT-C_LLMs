@@ -17,7 +17,7 @@ def output2score(prediction):
     # only reserve the token for score after TAIL (i.e., "\n### AUDIT-C Score:")
     score = int(prediction.split((TAIL).strip())[-1].strip())
 
-    assert 0 <= prediction <= 12
+    assert 0 <= score <= 12
 
     return score
 
@@ -89,7 +89,7 @@ if __name__ == "__main__":
     true_scores = []
 
     # Assuming you have a 'test_dataset' loaded similarly to 'dataset["val"]'
-    for example in tqdm(range(test_split)):
+    for example in tqdm(test_split):
         body = (
             f"Gender={example['gender']},\nRace={example['race']},"
             f"\nEthnicity={example['ethnicity']},\nAge={example['age']},"
