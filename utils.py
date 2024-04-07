@@ -7,7 +7,7 @@ PROJECT_NAME = 'AUDIT-C_LLMs'
 SEED = 6179
 
 MAX_LENGTH = 256
-MAX_OUTPUT_LENGTH = 16
+MAX_OUTPUT_LENGTH = 4
 HEAD = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C) "
         "from 0 to 12 based on the provided demographics and comorbidity data:\n")
 TAIL = "\n### AUDIT-C Score:"
