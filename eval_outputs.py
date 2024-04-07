@@ -35,7 +35,7 @@ def generate_prediction(model, tokenizer, input_text):
         str: The model's predicted output as a string.
     """
     input_ids = tokenizer.encode(input_text, return_tensors="pt").to(device)
-    generated_ids = model.generate(input_ids, max_length=MAX_OUTPUT_LENGTH)
+    generated_ids = model.generate(input_ids, max_length=MAX_LENGTH)
     prediction = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
     return prediction
