@@ -8,7 +8,7 @@ import json
 import os
 from pathlib import Path
 
-from utils import DATASET_PATH, MAX_OUTPUT_LENGTH, SEED, HEAD, MAX_LENGTH, TAIL
+from utils import DATASET_PATH, SEED, HEAD, MAX_LENGTH, TAIL
 
 # fixme
 # val_loss=9.049*e-9 (lr=3e-5, grad_accumu=4, auto_bs, outputlen=4)
