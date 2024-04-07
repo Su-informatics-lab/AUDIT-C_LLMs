@@ -9,6 +9,7 @@ from run_gen import HEAD, TAIL, MAX_LENGTH
 
 # val_loss=9.049*e-9 (lr=3e-5, grad_accumu=4, auto_bs)
 BEST_FLANT5_CKPT = 'ckpts/sft_generation_flan-t5-base_lr3e-5/checkpoint-2400'
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def output2score(prediction):
@@ -32,7 +33,7 @@ def generate_prediction(model, tokenizer, input_text):
     Returns:
         str: The model's predicted output as a string.
     """
-    input_ids = tokenizer.encode(input_text, return_tensors="pt")
+    input_ids = tokenizer.encode(input_text, return_tensors="pt").to(device)
     generated_ids = model.generate(input_ids, max_length=MAX_OUTPUT_LENGTH)
     prediction = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
@@ -56,7 +57,8 @@ def evaluate_mse(true_scores, predicted_scores):
 
 def evaluate_accuracy(true_scores, predicted_scores):
     """
-    Compute the accuracy as the proportion of exact matches between true scores and predicted scores.
+    Compute the accuracy as the proportion of exact matches between true scores and
+    predicted scores.
 
     Args:
         true_scores (list of int): The ground truth scores.
@@ -78,7 +80,7 @@ if __name__ == '__main__':
 
     test_split = load_from_disk(DATASET_PATH)['test']
     # fixme
-    model = T5ForConditionalGeneration.from_pretrained(BEST_FLANT5_CKPT)
+    model = T5ForConditionalGeneration.from_pretrained(BEST_FLANT5_CKPT).to(device)
     tokenizer = AutoTokenizer.from_pretrained(BEST_FLANT5_CKPT,
                                               max_length=MAX_LENGTH,
                                               padding_side="right",
