@@ -1,14 +1,14 @@
-import torch
-from sklearn.metrics import mean_squared_error
 import numpy as np
+import torch
 from datasets import load_from_disk
-from transformers import T5ForConditionalGeneration, AutoTokenizer
+from sklearn.metrics import mean_squared_error
+from transformers import AutoTokenizer, T5ForConditionalGeneration
 
-from utils import MAX_OUTPUT_LENGTH, SEED, DATASET_PATH, MODEL_NAME
-from run_gen import HEAD, TAIL, MAX_LENGTH
+from run_gen import HEAD, MAX_LENGTH, TAIL
+from utils import DATASET_PATH, MAX_OUTPUT_LENGTH, SEED
 
 # val_loss=9.049*e-9 (lr=3e-5, grad_accumu=4, auto_bs)
-BEST_FLANT5_CKPT = 'ckpts/sft_generation_flan-t5-base_lr3e-5/checkpoint-2400'
+BEST_FLANT5_CKPT = "ckpts/sft_generation_flan-t5-base_lr3e-5/checkpoint-2400"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -74,25 +74,26 @@ def evaluate_accuracy(true_scores, predicted_scores):
     return accuracy
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     torch.manual_seed(SEED + 2177)
 
-    test_split = load_from_disk(DATASET_PATH)['test']
+    test_split = load_from_disk(DATASET_PATH)["test"]
     # fixme
     model = T5ForConditionalGeneration.from_pretrained(BEST_FLANT5_CKPT).to(device)
-    tokenizer = AutoTokenizer.from_pretrained(BEST_FLANT5_CKPT,
-                                              max_length=MAX_LENGTH,
-                                              padding_side="right",
-                                              truncation=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        BEST_FLANT5_CKPT, max_length=MAX_LENGTH, padding_side="right", truncation=True
+    )
     predicted_scores = []
     true_scores = []
 
     # Assuming you have a 'test_dataset' loaded similarly to 'dataset["val"]'
     for example in test_split:
-        body = (f"Gender={example['gender']},\nRace={example['race']},"
-                f"\nEthnicity={example['ethnicity']},\nAge={example['age']},"
-                f"\nComorbidity={example['comorbidity']}\n")
+        body = (
+            f"Gender={example['gender']},\nRace={example['race']},"
+            f"\nEthnicity={example['ethnicity']},\nAge={example['age']},"
+            f"\nComorbidity={example['comorbidity']}\n"
+        )
         prediction = generate_prediction(model, tokenizer, HEAD + body + TAIL + " ")
         score = output2score(prediction)
         predicted_scores.append(score)
