@@ -81,7 +81,7 @@ preprocessor = ColumnTransformer(
 rf_pipeline = Pipeline(
     steps=[
         ("preprocessor", preprocessor),
-        ("regressor", RandomForestRegressor(random_state=SEED + 534))
+        ("regressor", RandomForestRegressor(random_state=SEED + 534)),
     ]
 )
 
