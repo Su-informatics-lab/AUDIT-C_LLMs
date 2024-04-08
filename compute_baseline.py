@@ -104,7 +104,7 @@ rf_c_index = concordance_index(y_test, rf_y_pred)
 
 print("Random Forest Baseline:\n")
 print(f"\tMSE: {rf_mse} (RMSE: {np.sqrt(rf_mse)})")
-print(f"\t(C-index): {rf_c_index}\n")
+print(f"\tC-index: {rf_c_index}\n")
 
 ###
 # linear regression
@@ -124,6 +124,6 @@ lr_c_index = concordance_index(y_test, lr_y_pred)
 
 print("Linear Regression Baseline:\n")
 print(f"\tMSE: {lr_mse} (RMSE: {np.sqrt(lr_mse)})")
-print(f"\t(C-index): {lr_c_index}\n")
+print(f"\tC-index: {lr_c_index}\n")
 
 print("*" * 90)
