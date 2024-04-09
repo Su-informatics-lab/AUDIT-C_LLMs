@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from datasets import load_from_disk
+from lifelines.utils import concordance_index
 from sklearn.metrics import mean_squared_error
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer, T5ForConditionalGeneration
@@ -70,23 +71,45 @@ def evaluate_mse(true_scores, predicted_scores):
     return mean_squared_error(true_scores, predicted_scores)
 
 
-def evaluate_accuracy(true_scores, predicted_scores):
+# def evaluate_accuracy(true_scores, predicted_scores):
+#     """
+#     Compute the accuracy as the proportion of exact matches between true scores and
+#     predicted scores.
+#
+#     Args:
+#         true_scores (list of int): The ground truth scores.
+#         predicted_scores (list of int): The scores predicted by the model.
+#
+#     Returns:
+#         float: The accuracy as a proportion of exact matches.
+#     """
+#     true_scores = np.array(true_scores)
+#     predicted_scores = np.array(predicted_scores)
+#     accuracy = np.mean(true_scores == predicted_scores)
+#
+#     return accuracy
+
+
+def evaluate_c_index(true_scores, predicted_scores):
     """
-    Compute the accuracy as the proportion of exact matches between true scores and
-    predicted scores.
+    Compute the concordance index (C-index) to measure the model's predictive accuracy.
+
+    The C-index quantifies how well the model's predicted scores are able to rank samples
+    in the same order as their true scores. A C-index of 0.5 suggests no better than random
+    chance, and a C-index of 1.0 indicates perfect prediction accuracy.
 
     Args:
-        true_scores (list of int): The ground truth scores.
-        predicted_scores (list of int): The scores predicted by the model.
+        true_scores (list of int or float): The ground truth scores.
+        predicted_scores (list of int or float): The scores predicted by the model.
 
     Returns:
-        float: The accuracy as a proportion of exact matches.
+        float: The C-index as a measure of predictive accuracy.
     """
     true_scores = np.array(true_scores)
     predicted_scores = np.array(predicted_scores)
-    accuracy = np.mean(true_scores == predicted_scores)
+    c_index = concordance_index(true_scores, predicted_scores)
 
-    return accuracy
+    return c_index
 
 
 def batch_generate_predictions(model, tokenizer, input_texts, batch_size=8):
@@ -103,10 +126,10 @@ def batch_generate_predictions(model, tokenizer, input_texts, batch_size=8):
     Returns:
         List[str]: The list of model's predicted outputs as strings.
     """
-    model.eval()  # Ensure model is in evaluation mode
+    model.eval()
     predictions = []
 
-    # Wrap the range function with tqdm for a progress bar
+    # wrap the range function with tqdm for a progress bar
     for i in tqdm(range(0, len(input_texts), batch_size),
                   desc="Generating predictions"):
         batch = input_texts[i:i + batch_size]
@@ -132,7 +155,7 @@ if __name__ == "__main__":
         BEST_FLANT5_CKPT, max_length=MAX_LENGTH, padding_side="right", truncation=True
     )
 
-    # Prepare the input texts for batch processing
+    # prepare the input texts for batch processing
     input_texts = [
         HEAD
         + (
@@ -145,25 +168,27 @@ if __name__ == "__main__":
         for example in test_split
     ]
 
-    # Generate predictions in batches
+    # generate predictions in batches
     batch_predictions = batch_generate_predictions(
         model, tokenizer, input_texts, batch_size=8
     )
 
-    # Convert predictions to scores
+    # convert predictions to scores
     predicted_scores = [output2score(pred) for pred in batch_predictions]
     true_scores = [example["audit.c.score"] for example in test_split]
 
-    # Evaluate MSE and Accuracy
+    # evaluate MSE and c-index
     mse = evaluate_mse(true_scores, predicted_scores)
-    accuracy = evaluate_accuracy(true_scores, predicted_scores)
-    print(f"MSE: {mse}")
-    print(f"Accuracy: {accuracy}")
+    c_index = evaluate_c_index(true_scores, predicted_scores)
+    # fixme: too rigid
+    print(f"{BEST_FLANT5_CKPT} Performance:\n")
+    print(f"\tMSE: {mse} (RMSE: {np.sqrt(mse)})")
+    print(f"\tC-index: {c_index}\n")
 
     # saving
     results_data = {
         "mse": mse,
-        "accuracy": accuracy,
+        "c_index": c_index,
         "predicted_scores": predicted_scores,
         "true_scores": true_scores,
     }
