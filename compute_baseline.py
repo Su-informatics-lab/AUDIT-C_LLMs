@@ -8,10 +8,11 @@ from datasets import load_from_disk
 from lifelines.utils import concordance_index
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import ElasticNet, LinearRegression
 from sklearn.metrics import accuracy_score, mean_squared_error
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.svm import SVR
 
 from utils import DATASET_PATH, SEED
 
@@ -125,5 +126,44 @@ lr_c_index = concordance_index(y_test, lr_y_pred)
 print("Linear Regression Baseline:\n")
 print(f"\tMSE: {lr_mse} (RMSE: {np.sqrt(lr_mse)})")
 print(f"\tC-index: {lr_c_index}\n")
+
+# Elastic Net Regression
+en_pipeline = Pipeline(
+    steps=[
+        ("preprocessor", preprocessor),
+        ("regressor", ElasticNet())
+    ]
+)
+
+en_pipeline.fit(X_train, y_train)
+
+en_y_pred = en_pipeline.predict(X_test)
+
+en_mse = mean_squared_error(y_test, en_y_pred)
+en_c_index = concordance_index(y_test, en_y_pred)
+
+print("Elastic Net Regression Baseline:\n")
+print(f"\tMSE: {en_mse} (RMSE: {np.sqrt(en_mse)})")
+print(f"\tC-index: {en_c_index}\n")
+
+###
+# Support Vector Machine (SVM)
+svm_pipeline = Pipeline(
+    steps=[
+        ("preprocessor", preprocessor),
+        ("regressor", SVR())
+    ]
+)
+
+svm_pipeline.fit(X_train, y_train)
+
+svm_y_pred = svm_pipeline.predict(X_test)
+
+svm_mse = mean_squared_error(y_test, svm_y_pred)
+svm_c_index = concordance_index(y_test, svm_y_pred)
+
+print("Support Vector Machine (SVM) Baseline:\n")
+print(f"\tMSE: {svm_mse} (RMSE: {np.sqrt(svm_mse)})")
+print(f"\tC-index: {svm_c_index}\n")
 
 print("*" * 90)
