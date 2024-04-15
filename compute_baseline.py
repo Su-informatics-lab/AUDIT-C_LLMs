@@ -11,7 +11,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import ElasticNet, LinearRegression
 from sklearn.metrics import accuracy_score, mean_squared_error
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
 from sklearn.svm import SVR
 
 from utils import DATASET_PATH, SEED
@@ -43,7 +43,8 @@ def expand_comorbidity(df, comorbidity_col="comorbidity", separator=","):
         separator (str): The separator used in the comorbidity strings.
 
     Returns:
-        pd.DataFrame: DataFrame with expanded comorbidity features.
+        pd.DataFrame: DataFrame with expanded comorbidity features and the original
+        comorbidity column removed.
     """
     # split the comorbidity strings into lists
     comorbidity_lists = df[comorbidity_col].str.split(separator)
@@ -55,13 +56,15 @@ def expand_comorbidity(df, comorbidity_col="comorbidity", separator=","):
 
     # initialize columns for each comorbidity
     for comorbidity in unique_comorbidities:
-        df[f"comorbidity_{comorbidity}"] = comorbidity_lists.apply(
+        # replace underscores with spaces
+        comorbidity_cleaned = comorbidity.replace("_", " ")
+        df[comorbidity_cleaned] = comorbidity_lists.apply(
             lambda x: int(comorbidity in x) if isinstance(x, list) else 0
         )
 
-    return df.drop(
-        comorbidity_col, axis=1
-    )  # optionally drop the original comorbidity column
+    df.drop(comorbidity_col, axis=1, inplace=True)
+
+    return df
 
 
 train_df = convert_to_dataframe(dataset["train"])
@@ -112,6 +115,7 @@ print(f"\tC-index: {rf_c_index}\n")
 lr_pipeline = Pipeline(
     steps=[
         ("preprocessor", preprocessor),
+        ("scaler", StandardScaler()),
         ("regressor", LinearRegression())
     ]
 )
@@ -131,6 +135,7 @@ print(f"\tC-index: {lr_c_index}\n")
 en_pipeline = Pipeline(
     steps=[
         ("preprocessor", preprocessor),
+        ("scaler", StandardScaler()),
         ("regressor", ElasticNet())
     ]
 )
@@ -151,7 +156,8 @@ print(f"\tC-index: {en_c_index}\n")
 svm_pipeline = Pipeline(
     steps=[
         ("preprocessor", preprocessor),
-        ("regressor", SVR())
+        ("scaler", MinMaxScaler()),  # scaling down age
+        ("regressor", SVR()),
     ]
 )
 
