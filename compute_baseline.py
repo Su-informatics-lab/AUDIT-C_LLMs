@@ -118,7 +118,7 @@ svm_pipeline = Pipeline(
     steps=[
         ("preprocessor", preprocessor),
         ("scaler", MinMaxScaler()),  # standardizing
-        ("regressor", SVR('linear')),
+        ("regressor", SVR(kernel='linear')),
     ]
 )
 
