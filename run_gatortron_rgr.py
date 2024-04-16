@@ -81,6 +81,7 @@ class GatorTron_Regresser(BertPreTrainedModel):
         # output = self.tanh1(output)
         # output = self.dropout(output)  # fixme: apply dropout
         output = self.ff2(output)
+        output = output.squeeze(-1)
 
         return output
 
