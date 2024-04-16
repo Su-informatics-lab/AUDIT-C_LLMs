@@ -9,7 +9,8 @@ from tqdm import tqdm, trange
 from transformers import (AutoConfig, AutoModel, AutoTokenizer,
                           BertPreTrainedModel)
 
-from utils import DATASET_PATH, expand_comorbidity, convert_to_dataframe
+from utils import DATASET_PATH
+from compute_baseline import expand_comorbidity, convert_to_dataframe
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
