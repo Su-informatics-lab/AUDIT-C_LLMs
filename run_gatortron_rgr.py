@@ -7,6 +7,7 @@ to the T5 scripts.
 
 import os
 
+import evaluate
 import torch
 import torch.nn as nn
 import wandb
@@ -19,7 +20,6 @@ from transformers import (AutoConfig, AutoModel,
 
 from utils import (DATASET_PATH, PROJECT_NAME, convert_to_dataframe,
                    expand_comorbidity)
-
 
 __author__ = "hw56@indiana.edu"
 __version__ = "0.0.1"
@@ -85,20 +85,16 @@ class GatorTron_Regresser(BertPreTrainedModel):
         return {"loss": loss, "logits": output}
 
 
-# define metrics for regression
-def compute_metrics(eval_pred):
-    predictions, labels = eval_pred
-    mse = ((predictions - labels) ** 2).mean()
-    return {"mse": mse}
-
-
+# tokenizer
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-mse_metric = load_metric("mse", trust_remote_code=True)
+# metrics for regression
+mse_metric = evaluate.load("mse")
 
 
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
-    return {"mse": mse_metric.compute(predictions=predictions, references=labels)}
+    mse = mse_metric.compute(predictions=predictions.squeeze(), references=labels)
+    return {"mse": mse}
 
 
 # load dataset
