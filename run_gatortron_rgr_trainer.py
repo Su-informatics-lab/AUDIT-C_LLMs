@@ -18,7 +18,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class GatorTron_Dataset(Dataset):
     def __init__(self, df, tokenizer, max_len):
-        self.df = df.reset_index(drop=True)
+        self.df = df.reset_index(drop=True)  # drop index
         self.max_len = max_len
         self.texts = [
             ' '.join(f'{k}: {v}' for k, v in row.items() if k != 'audit.c.score') for
@@ -33,46 +33,76 @@ class GatorTron_Dataset(Dataset):
 
     def __getitem__(self, idx):
         item = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
-        item['labels'] = torch.tensor(self.labels[idx], dtype=torch.float)
+        item['labels'] = torch.tensor(self.labels[idx], dtype=torch.float32)
         return item
 
 
 class GatorTron_Regresser(BertPreTrainedModel):
     def __init__(self, model_name):
-        # initialize config
         config = AutoConfig.from_pretrained(model_name)
         super().__init__(config)
-
         self.gatortron = AutoModel.from_pretrained(model_name)
-
-        # define the regression head layers
-        self.cls_layer1 = nn.Linear(config.hidden_size, 128)  # 1024, 128
+        self.cls_layer1 = nn.Linear(config.hidden_size, 128)
         self.relu1 = nn.ReLU()
-        # self.ff1 = nn.Linear(128, 128)
-        # self.tanh1 = nn.Tanh()
-        # self.dropout = nn.Dropout(config.hidden_dropout_prob)  # fixme: add dropout
         self.ff2 = nn.Linear(128, 1)
 
-        # initialize weights for newly defined layers
-        self.init_weights()
-
-    def forward(self, input_ids, attention_mask):
-        # Feed the input to the GatorTron model to obtain contextualized representations
+    def forward(self, input_ids, attention_mask, labels=None):
         outputs = self.gatortron(input_ids=input_ids, attention_mask=attention_mask)
-
-        # get the representations of [CLS]
         logits = outputs.last_hidden_state[:, 0, :]
-
-        # pass through the regression head
         output = self.cls_layer1(logits)
         output = self.relu1(output)
-        # output = self.ff1(output)
-        # output = self.tanh1(output)
-        # output = self.dropout(output)  # fixme: apply dropout
-        output = self.ff2(output)
-        output = output.squeeze(-1)
+        output = self.ff2(output).squeeze(-1)
 
-        return output
+        loss = None
+        if labels is not None:
+            loss_fn = nn.MSELoss()
+            loss = loss_fn(output, labels.float())
+
+        return {"loss": loss, "logits": output}
+
+
+# Define metrics for regression
+def compute_metrics(eval_pred):
+    predictions, labels = eval_pred
+    mse = ((predictions - labels) ** 2).mean()  # Assuming predictions and labels are correctly aligned
+    return {"mse": mse}
+
+# class GatorTron_Regresser(BertPreTrainedModel):
+#     def __init__(self, model_name):
+#         # initialize config
+#         config = AutoConfig.from_pretrained(model_name)
+#         super().__init__(config)
+#
+#         self.gatortron = AutoModel.from_pretrained(model_name)
+#
+#         # define the regression head layers
+#         self.cls_layer1 = nn.Linear(config.hidden_size, 128)  # 1024, 128
+#         self.relu1 = nn.ReLU()
+#         # self.ff1 = nn.Linear(128, 128)
+#         # self.tanh1 = nn.Tanh()
+#         # self.dropout = nn.Dropout(config.hidden_dropout_prob)  # fixme: add dropout
+#         self.ff2 = nn.Linear(128, 1)
+#
+#         # initialize weights for newly defined layers
+#         self.init_weights()
+#
+#     def forward(self, input_ids, attention_mask):
+#         # Feed the input to the GatorTron model to obtain contextualized representations
+#         outputs = self.gatortron(input_ids=input_ids, attention_mask=attention_mask)
+#
+#         # get the representations of [CLS]
+#         logits = outputs.last_hidden_state[:, 0, :]
+#
+#         # pass through the regression head
+#         output = self.cls_layer1(logits)
+#         output = self.relu1(output)
+#         # output = self.ff1(output)
+#         # output = self.tanh1(output)
+#         # output = self.dropout(output)  # fixme: apply dropout
+#         output = self.ff2(output)
+#         output = output.squeeze(-1)
+#
+#         return output
 
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
@@ -91,8 +121,11 @@ eval_dataset = GatorTron_Dataset(val_df, tokenizer, GATROTRON_MAX_LEN)
 
 # init model
 config = AutoConfig.from_pretrained(MODEL_NAME, num_labels=1)  # regression
-model = AutoModelForSequenceClassification.from_pretrained(GatorTron_Regresser(MODEL_NAME),
-                                                           config=config).to(device)
+# Assuming GatorTron_Regresser is correctly defined elsewhere in your code:
+model = GatorTron_Regresser(MODEL_NAME).to("cuda")
+
+# model = AutoModelForSequenceClassification.from_pretrained(GatorTron_Regresser(MODEL_NAME),
+#                                                            config=config).to(device)
 
 
 # model = GatorTron_Regresser(MODEL_NAME).to("cuda")
