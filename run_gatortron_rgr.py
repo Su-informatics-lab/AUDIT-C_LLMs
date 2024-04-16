@@ -144,7 +144,6 @@ trainer = Trainer(
     args=training_args,
     train_dataset=train_dataset,
     eval_dataset=eval_dataset,
-    predict_dataset=test_dataset,
     compute_metrics=compute_metrics,
     callbacks=[EarlyStoppingCallback(early_stopping_patience=20)],
 )
