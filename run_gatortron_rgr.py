@@ -28,7 +28,7 @@ __license__ = "0BSD"
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 MODEL_NAME = "UFNLP/gatortron-base"
-GATROTRON_MAX_LEN = 160
+GATROTRON_MAX_LEN = 192
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
