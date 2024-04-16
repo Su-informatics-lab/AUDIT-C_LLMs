@@ -10,6 +10,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import ElasticNet, LinearRegression
 from sklearn.metrics import accuracy_score, mean_squared_error
 from sklearn.pipeline import Pipeline
+from sklearn.linear_model import Ridge
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
 from sklearn.svm import SVR
 
@@ -90,6 +91,28 @@ print("Linear Regression Baseline:\n")
 print(f"\tMSE: {lr_mse} (RMSE: {np.sqrt(lr_mse)})")
 print(f"\tC-index: {lr_c_index}\n")
 print("*" * 40)
+
+# Ridge Regression
+ridge_pipeline = Pipeline(
+    steps=[
+        ("preprocessor", preprocessor),
+        ("scaler", StandardScaler()),
+        ("regressor", Ridge())  # Using Ridge regression here
+    ]
+)
+
+ridge_pipeline.fit(X_train, y_train)
+
+ridge_y_pred = ridge_pipeline.predict(X_test)
+
+ridge_mse = mean_squared_error(y_test, ridge_y_pred)
+ridge_c_index = concordance_index(y_test, ridge_y_pred)
+
+print("Ridge Regression Baseline:\n")
+print(f"\tMSE: {ridge_mse} (RMSE: {np.sqrt(ridge_mse)})")
+print(f"\tC-index: {ridge_c_index}\n")
+print("*" * 40)
+
 
 # Elastic Net Regression
 en_pipeline = Pipeline(
