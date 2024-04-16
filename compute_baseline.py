@@ -87,8 +87,8 @@ preprocessor = ColumnTransformer(
     remainder="passthrough",
 )
 
-print("*" * 90)
-print("Calculating random forest and linear regression baselines:")
+print("*" * 80)
+print("Calculating baselines for AUDIT-C Scoring:")
 
 ###
 # random forest
@@ -109,6 +109,7 @@ rf_c_index = concordance_index(y_test, rf_y_pred)
 print("Random Forest Baseline:\n")
 print(f"\tMSE: {rf_mse} (RMSE: {np.sqrt(rf_mse)})")
 print(f"\tC-index: {rf_c_index}\n")
+print("*" * 40)
 
 ###
 # linear regression
@@ -130,6 +131,7 @@ lr_c_index = concordance_index(y_test, lr_y_pred)
 print("Linear Regression Baseline:\n")
 print(f"\tMSE: {lr_mse} (RMSE: {np.sqrt(lr_mse)})")
 print(f"\tC-index: {lr_c_index}\n")
+print("*" * 40)
 
 # Elastic Net Regression
 en_pipeline = Pipeline(
@@ -150,14 +152,15 @@ en_c_index = concordance_index(y_test, en_y_pred)
 print("Elastic Net Regression Baseline:\n")
 print(f"\tMSE: {en_mse} (RMSE: {np.sqrt(en_mse)})")
 print(f"\tC-index: {en_c_index}\n")
+print("*" * 40)
 
 ###
 # Support Vector Machine (SVM)
 svm_pipeline = Pipeline(
     steps=[
         ("preprocessor", preprocessor),
-        ("scaler", MinMaxScaler()),  # scaling down age
-        ("regressor", SVR()),
+        ("scaler", MinMaxScaler()),  # standardizing
+        ("regressor", SVR('linear')),
     ]
 )
 
@@ -171,5 +174,4 @@ svm_c_index = concordance_index(y_test, svm_y_pred)
 print("Support Vector Machine (SVM) Baseline:\n")
 print(f"\tMSE: {svm_mse} (RMSE: {np.sqrt(svm_mse)})")
 print(f"\tC-index: {svm_c_index}\n")
-
-print("*" * 90)
+print("*" * 80)
