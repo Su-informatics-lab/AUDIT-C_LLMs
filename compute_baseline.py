@@ -3,7 +3,6 @@ Calculate random forest and linear regression baselines for AUDIT-C Scoring task
 """
 
 import numpy as np
-import pandas as pd
 from datasets import load_from_disk
 from lifelines.utils import concordance_index
 from sklearn.compose import ColumnTransformer
@@ -14,7 +13,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
 from sklearn.svm import SVR
 
-from utils import DATASET_PATH, SEED
+from utils import DATASET_PATH, SEED, convert_to_dataframe, expand_comorbidity
 
 dataset = load_from_disk(DATASET_PATH)
 # define preprocessing for categorical features (one-hot encoding)
@@ -24,47 +23,6 @@ categorical_transformer = OneHotEncoder(handle_unknown="ignore")
 __author__ = "hw56@indiana.edu"
 __version__ = "0.0.1"
 __license__ = "0BSD"
-
-
-def convert_to_dataframe(dataset):
-    df = pd.DataFrame(dataset)
-    # select the relevant features and target variable
-    df = df[["gender", "race", "ethnicity", "age", "comorbidity", "audit.c.score"]]
-    return df
-
-
-def expand_comorbidity(df, comorbidity_col="comorbidity", separator=","):
-    """
-    Expand the comorbidity column into multiple binary features.
-
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        comorbidity_col (str): Name of the comorbidity column.
-        separator (str): The separator used in the comorbidity strings.
-
-    Returns:
-        pd.DataFrame: DataFrame with expanded comorbidity features and the original
-        comorbidity column removed.
-    """
-    # split the comorbidity strings into lists
-    comorbidity_lists = df[comorbidity_col].str.split(separator)
-
-    # get the set of unique comorbidities
-    unique_comorbidities = set()
-    for com_list in comorbidity_lists.dropna():
-        unique_comorbidities.update(com_list)
-
-    # initialize columns for each comorbidity
-    for comorbidity in unique_comorbidities:
-        # replace underscores with spaces
-        comorbidity_cleaned = comorbidity.replace("_", " ")
-        df[comorbidity_cleaned] = comorbidity_lists.apply(
-            lambda x: int(comorbidity in x) if isinstance(x, list) else 0
-        )
-
-    df.drop(comorbidity_col, axis=1, inplace=True)
-
-    return df
 
 
 train_df = convert_to_dataframe(dataset["train"])
