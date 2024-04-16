@@ -37,7 +37,7 @@ class GatorTron_Dataset(Dataset):
         self.df = df.reset_index(drop=True)  # drop index
         self.max_len = max_len
         self.texts = [
-            " ".join(f"{k}: {v}" for k, v in row.items() if k != "audit.c.score")
+            ", ".join(f"{k}: {v}" for k, v in row.items() if k != "audit.c.score")
             for index, row in self.df.iterrows()
         ]
         self.labels = df["audit.c.score"].tolist()
