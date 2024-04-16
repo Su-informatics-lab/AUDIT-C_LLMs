@@ -1,3 +1,10 @@
+"""
+This module fine-tunes a GatorTron model in a regression way to make AUDIT-C scoring.
+It uses the dataset as the `run_gen.py` (which uses a T5 and treat the task as a
+virtually a single-token classification task). It has different input formats compared
+to the T5 scripts.
+"""
+
 import os
 
 import torch
@@ -12,6 +19,12 @@ from transformers import (AutoConfig, AutoModel,
 
 from utils import (DATASET_PATH, PROJECT_NAME, convert_to_dataframe,
                    expand_comorbidity)
+
+
+__author__ = "hw56@indiana.edu"
+__version__ = "0.0.1"
+__license__ = "0BSD"
+
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 MODEL_NAME = "UFNLP/gatortron-base"
