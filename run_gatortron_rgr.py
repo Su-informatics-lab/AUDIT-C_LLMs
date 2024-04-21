@@ -71,11 +71,11 @@ class GatorTron_Regresser(BertPreTrainedModel):
     def __init__(self, model_name, non_linear_head=False):
         config = AutoConfig.from_pretrained(model_name)
         super().__init__(config)
-        self.non_linear = non_linear_head
+        self.non_linear_head = non_linear_head
         self.gatortron = AutoModel.from_pretrained(model_name)
         self.cls_layer1 = nn.Linear(config.hidden_size, 128)
         self.relu1 = nn.ReLU()
-        if self.non_linear:
+        if self.non_linear_head:
             self.ff1 = nn.Linear(128, 128)
             self.tanh1 = nn.Tanh()
             self.dropout = nn.Dropout(config.hidden_dropout_prob)  # fixme: add dropout
