@@ -64,7 +64,7 @@ def compute_metrics(eval_pred):
     predictions, labels = eval_pred
     mse = evaluate_mse(labels, predictions.squeeze())
     c_index = evaluate_c_index(labels, predictions.squeeze())
-    return {"eval_mse": mse, "eval_rmse": np.sqrt(mse), "eval_c-index": c_index}
+    return {"mse": mse, "rmse": np.sqrt(mse), "c-index": c_index}
 
 
 def convert_to_dataframe(dataset):
