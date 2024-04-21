@@ -169,3 +169,8 @@ if __name__ == "__main__":
 
     # train the model
     trainer.train()
+
+    # evaluate on the test set after training
+    test_results = trainer.evaluate(test_dataset)
+    wandb.log({"test_results": test_results})
+    print("Test Results:", test_results)
