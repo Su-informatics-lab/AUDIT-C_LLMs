@@ -107,9 +107,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--non_linear_head",
-        type=bool,
+        action='store_true',
         default=False,
-        help="whether to use non-linear regression head",
+        help="whether to use non-linear regression head"
     )
     args = parser.parse_args()
     run_name = (
