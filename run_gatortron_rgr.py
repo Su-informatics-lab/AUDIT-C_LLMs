@@ -132,7 +132,7 @@ if __name__ == "__main__":
 
     # init model
     config = AutoConfig.from_pretrained(MODEL_NAME, num_labels=1)  # for regression
-    model = GatorTron_Regresser(MODEL_NAME).to(device)
+    model = GatorTron_Regresser(MODEL_NAME, args.non_linear_head).to(device)
 
     training_args = TrainingArguments(
         output_dir=os.path.join("ckpts", run_name),
