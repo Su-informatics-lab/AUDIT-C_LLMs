@@ -1,4 +1,7 @@
 import pandas as pd
+import numpy as np
+from lifelines.utils import concordance_index
+from sklearn.metrics import mean_squared_error
 
 CSV_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_CX_04052024.csv'
 DATASET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_CX_04052024'
@@ -12,6 +15,56 @@ HEAD = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C
         "from 0 to 12 based on the provided demographics and comorbidity data:\n")
 TAIL = "\n### AUDIT-C Score:"
 
+
+def period_separated_column_concatenation_formatting(a_row):
+    return ", ".join(f"{k}: {v}" for k, v in a_row.items() if k != "audit.c.score")
+
+
+def evaluate_mse(true_scores, predicted_scores):
+    """
+    Compute the Mean Squared Error (MSE) between true scores and predicted scores.
+
+    Args:
+        true_scores: The ground truth scores.
+        predicted_scores: The scores predicted by the model.
+
+    Returns:
+        float: The computed MSE.
+    """
+
+    return mean_squared_error(true_scores, predicted_scores)
+
+
+def evaluate_c_index(true_scores, predicted_scores):
+    """
+    Compute the concordance index (C-index).
+
+    The C-index quantifies how well the model's predicted scores are able to rank
+    samples in the same order as their true scores. A C-index of 0.5 suggests no better
+    than random chance, and a C-index of 1.0 indicates perfect prediction performance.
+
+    Args:
+        true_scores: The ground truth scores.
+        predicted_scores: The scores predicted by the model.
+
+    Returns:
+        float: The C-index as a measure of predictive accuracy.
+    """
+
+    return concordance_index(true_scores, predicted_scores)
+
+
+def compute_metrics(eval_pred):
+    """
+    Compute eval metrics during training, required by Trainer.
+    :param eval_pred:
+    :return:
+    """
+
+    predictions, labels = eval_pred
+    mse = evaluate_mse(labels, predictions.squeeze())
+    c_index = evaluate_c_index(labels, predictions.squeeze())
+    return {"eval_mse": mse, "eval_rmse": np.sqrt(mse), "eval_c-index": c_index}
 
 
 def convert_to_dataframe(dataset):
