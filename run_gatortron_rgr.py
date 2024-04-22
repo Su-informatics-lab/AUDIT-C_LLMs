@@ -78,7 +78,8 @@ class GatorTron_Regresser(BertPreTrainedModel):
         if self.non_linear_head:
             self.ff1 = nn.Linear(128, 128)
             self.tanh1 = nn.Tanh()
-            self.dropout = nn.Dropout(config.hidden_dropout_prob)  # fixme: add dropout
+            # dropout rate = 0.1, for GatorTron-base
+            self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.ff2 = nn.Linear(128, 1)
 
     def forward(self, input_ids, attention_mask, labels=None):
@@ -89,7 +90,7 @@ class GatorTron_Regresser(BertPreTrainedModel):
         if self.non_linear_head:
             output = self.ff1(output)
             output = self.tanh1(output)
-            output = self.dropout(output)  # fixme: apply dropout
+            output = self.dropout(output)
         output = self.ff2(output).squeeze(-1)
 
         loss = None
