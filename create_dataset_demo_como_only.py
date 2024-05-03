@@ -6,10 +6,10 @@ Create AUDIT-C Scoring dataset for a quick and dirty pilot run using
 '''
 
 from datasets import load_dataset, DatasetDict
-from utils import CSV_PATH, DATASET_PATH, SEED
+from utils import CSV_DEMO_COMO_ONLY_PATH, DATASET_PATH, SEED
 
 
-dataset = load_dataset('csv', data_files=CSV_PATH)
+dataset = load_dataset('csv', data_files=CSV_DEMO_COMO_ONLY_PATH)
 dataset = dataset.shuffle(seed=SEED)
 
 train_test_split = dataset['train'].train_test_split(test_size=5500, seed=SEED)
