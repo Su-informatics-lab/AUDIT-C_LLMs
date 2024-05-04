@@ -110,10 +110,11 @@ if __name__ == "__main__":
         if not args.non_linear_head
         else "gatrotron_rgr_demo_como_threeDrug_non_linear_head"
     )
-
+    print('args ok')
     # load dataset and tokenizer
     df = pd.read_parquet(DEMO_COMO_THREE_DRUG_PARQUET_PATH)
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    print('tokenizer ok')
     # 1. expand comorbidity into multiple binary ratings for all possible comorbidity
     # 2. ignore 'q1.score', 'q2.score', 'q3.score', 'audit.c.score', 'person_id', and
     # 'split'
