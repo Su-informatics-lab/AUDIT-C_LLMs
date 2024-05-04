@@ -29,7 +29,7 @@ __version__ = "0.0.2"
 __license__ = "0BSD"
 
 
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+# os.environ["TOKENIZERS_PARALLELISM"] = "false"
 MODEL_NAME = "UFNLP/gatortron-base"
 # max input len 467
 GATROTRON_MAX_LEN = 512 - 32
@@ -127,11 +127,11 @@ if __name__ == "__main__":
     train_dataset = GatorTron_Dataset(train_df, tokenizer, GATROTRON_MAX_LEN)
     eval_dataset = GatorTron_Dataset(val_df, tokenizer, GATROTRON_MAX_LEN)
     test_dataset = GatorTron_Dataset(test_df, tokenizer, GATROTRON_MAX_LEN)
-
+    print('data ok')
     # init model
     config = AutoConfig.from_pretrained(MODEL_NAME, num_labels=1)  # for regression
     model = GatorTron_Regresser(MODEL_NAME, args.non_linear_head).to(device)
-    print('model, data, ok')
+    print('model ok')
     training_args = TrainingArguments(
         output_dir=os.path.join("ckpts", run_name),
         overwrite_output_dir=False,
