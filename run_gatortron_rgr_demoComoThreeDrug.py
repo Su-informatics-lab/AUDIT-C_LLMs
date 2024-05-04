@@ -11,31 +11,18 @@ AUDIT-C scores.
 import argparse
 import os
 
+import pandas as pd
 import torch
 import torch.nn as nn
 import wandb
-import pandas as pd
-from datasets import load_from_disk
 from torch.utils.data import Dataset
-from transformers import (
-    AutoConfig,
-    AutoModel,
-    AutoTokenizer,
-    BertPreTrainedModel,
-    EarlyStoppingCallback,
-    Trainer,
-    TrainingArguments,
-)
+from transformers import (AutoConfig, AutoModel, AutoTokenizer,
+                          BertPreTrainedModel, EarlyStoppingCallback, Trainer,
+                          TrainingArguments)
 
-from utils import (
-    DEMO_COMO_THREE_DRUG_PARQUET_PATH,
-    PROJECT_NAME,
-    SEED,
-    compute_metrics,
-    convert_to_dataframe,
-    expand_comorbidity,
-    period_separated_column_concatenation_formatting,
-)
+from utils import (DEMO_COMO_THREE_DRUG_PARQUET_PATH, PROJECT_NAME, SEED,
+                   compute_metrics, expand_comorbidity,
+                   period_separated_column_concatenation_formatting)
 
 __author__ = "hw56@indiana.edu"
 __version__ = "0.0.2"
