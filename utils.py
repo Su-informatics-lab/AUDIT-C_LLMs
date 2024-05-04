@@ -102,9 +102,12 @@ def expand_comorbidity(df, comorbidity_col="comorbidity", separator=","):
     for comorbidity in unique_comorbidities:
         # replace underscores with spaces
         comorbidity_cleaned = comorbidity.replace("_", " ")
-        df[comorbidity_cleaned] = comorbidity_lists.apply(
+        df.loc[:, comorbidity_cleaned] = comorbidity_lists.apply(
             lambda x: int(comorbidity in x) if isinstance(x, list) else 0
         )
+        # df[comorbidity_cleaned] = comorbidity_lists.apply(
+        #     lambda x: int(comorbidity in x) if isinstance(x, list) else 0
+        # )
 
     df.drop(comorbidity_col, axis=1, inplace=True)
 
