@@ -6,7 +6,7 @@ Create AUDIT-C Scoring dataset for a quick and dirty pilot run using
 '''
 
 from datasets import load_dataset, DatasetDict
-from utils import CSV_DEMO_COMO_ONLY_PATH, DATASET_PATH, SEED
+from utils import CSV_DEMO_COMO_ONLY_PATH, DEMO_COMO_DATASET_PATH, SEED
 
 
 dataset = load_dataset('csv', data_files=CSV_DEMO_COMO_ONLY_PATH)
@@ -21,4 +21,4 @@ split_datasets = DatasetDict({
     'test': val_test_split['test']  # 5,000
 })
 
-split_datasets.save_to_disk(DATASET_PATH)
+split_datasets.save_to_disk(DEMO_COMO_DATASET_PATH)
