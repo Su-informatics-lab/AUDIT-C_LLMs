@@ -19,7 +19,53 @@ TAIL = "\n### AUDIT-C Score:"
 
 
 def period_separated_column_concatenation_formatting(a_row):
-    return ", ".join(f"{k}: {v}" for k, v in a_row.items() if k != "audit.c.score")
+    """
+    Concatenates all the indicative columns into a single string for LLM consumption.
+
+    Note:
+        - Fields 'q1.score', 'q2.score', 'q3.score', 'audit.c.score', 'person_id', and
+        'split' are ignored.
+        - Numerated concept_names and drug_exposure_start_dates are renamed for
+            stylistic consistency.
+        - Most recent drug use is closer to comorbidity.
+
+    An example is shown below.
+        ```gender: [mask], race: [mask], ethnicity: [mask], age: [mask],
+        Rheumatic Disease: [mask], Diabetes wo C: [mask], Metastatic Solid Tumor:
+        [mask], Liver Disease Moderate Severe: [mask], Myocardial Infarction: [mask],
+        Peripheral Vascular Disease: [mask], Liver Disease Mild: [mask], Congestive
+        Heart Failure: [mask], Chronic Pulmonary Disease: [mask], Dementia: [mask],
+        Cerebrovascular Disease: [mask], Renal Disease Mild Moderate: [mask],
+        Hemiplegia Paraplegia: [mask], Renal Disease Severe: [mask], Malignancy: [mask],
+        Peptic Ulcer Disease: [mask], Diabetes w C: [mask], HIV: [mask],
+        Concept Name: [mask] (Exposure Start Date: [mask]), Concept Name: [mask]
+        (Exposure Start Date: [mask]), Concept Name: [mask] (Exposure Start Date:
+        [mask])```
+
+    Args:
+        A row in dataframe.
+    Returns:
+        A string of demographics, comorbidity, and drug use of a specific person.
+    """
+    formatted_row = []
+    drug_data_pairs = []
+    for k, v in a_row.items():
+        if k in ['q1.score', 'q2.score', 'q3.score', 'audit.c.score', 'person_id', 'split']:
+            continue
+        elif k.startswith('concept_name'):
+            drug_number = k.split('_')[-1]
+            drug_exposure_date = a_row[f'drug_exposure_start_date_{drug_number}']
+            drug_data_pairs.append(f'Concept Name: {v} (Exposure Start Date: {drug_exposure_date})')
+        elif k.startswith('drug_exposure_start_date'):
+            continue
+        else:
+            formatted_row.append(f"{k}: {v}")
+    formatted_row.extend(drug_data_pairs)
+    return ", ".join(formatted_row)
+
+
+# def period_separated_column_concatenation_formatting(a_row):
+#     return ", ".join(f"{k}: {v}" for k, v in a_row.items() if k != "audit.c.score")
 
 
 def evaluate_mse(true_scores, predicted_scores):
