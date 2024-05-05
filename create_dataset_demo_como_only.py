@@ -2,23 +2,27 @@
 Create AUDIT-C Scoring dataset for a quick and dirty pilot run using
 `AUD_LLM_CX_04052024.csv`.
 
-206,864 samples are for training, 500 for val, and 5,000 for test.
+20,364 samples are for training, 2,000 for val, and 5,000 for test.
 '''
 
-from datasets import load_dataset, DatasetDict
-from utils import CSV_DEMO_COMO_ONLY_PATH, DEMO_COMO_DATASET_PATH, SEED
+import pandas as pd
+from utils import CSV_DEMO_COMO_ONLY_PATH, DEMO_COMO_PARQUET_PATH, SEED
+from sklearn.model_selection import train_test_split
 
 
-dataset = load_dataset('csv', data_files=CSV_DEMO_COMO_ONLY_PATH)
-dataset = dataset.shuffle(seed=SEED)
+demo_como = pd.read_csv(CSV_DEMO_COMO_ONLY_PATH)
+# data split
+remaining_data, validation_data = train_test_split(
+    demo_como, test_size=2000, random_state=SEED
+)
+remaining_data, test_data = train_test_split(
+    remaining_data, test_size=5000, random_state=SEED
+)
 
-train_test_split = dataset['train'].train_test_split(test_size=5500, seed=SEED)
-val_test_split = train_test_split['test'].train_test_split(test_size=5000, seed=SEED)
+validation_data["split"] = "validation"
+test_data["split"] = "test"
+remaining_data["split"] = "train"
+final_df_split = pd.concat([remaining_data, validation_data, test_data])
 
-split_datasets = DatasetDict({
-    'train': train_test_split['train'],  # 206,864
-    'val': val_test_split['train'],  # 500
-    'test': val_test_split['test']  # 5,000
-})
-
-split_datasets.save_to_disk(DEMO_COMO_DATASET_PATH)
+# save parquet
+final_df_split.to_parquet(DEMO_COMO_PARQUET_PATH, index=False)
