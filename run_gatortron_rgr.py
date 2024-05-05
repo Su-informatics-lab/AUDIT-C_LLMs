@@ -7,11 +7,11 @@ to the T5 scripts.
 
 import argparse
 import os
+import pandas as pd
 
 import torch
 import torch.nn as nn
 import wandb
-from datasets import load_from_disk
 from torch.utils.data import Dataset
 from transformers import (
     AutoConfig,
@@ -24,7 +24,7 @@ from transformers import (
 )
 
 from utils import (
-    DATASET_PATH,
+    DEMO_COMO_PARQUET_PATH,
     PROJECT_NAME,
     SEED,
     compute_metrics,
@@ -120,13 +120,21 @@ if __name__ == "__main__":
     )
 
     # load dataset and tokenizer
-    dataset = load_from_disk(DATASET_PATH)
+    df = pd.read_parquet(DEMO_COMO_PARQUET_PATH)
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
-    train_df = expand_comorbidity(convert_to_dataframe(dataset["train"]))
-    val_df = expand_comorbidity(convert_to_dataframe(dataset["val"]))
-    test_df = expand_comorbidity(convert_to_dataframe(dataset["test"]))
-
+    train_df = expand_comorbidity(df.loc[df.split == 'train'])
+    val_df = expand_comorbidity(df.loc[df.split == 'validation'])
+    test_df = expand_comorbidity(df.loc[df.split == 'test'])
+    # a typical input reads (demo + como):
+    # 'gender: [mask], race: [mask], ethnicity: [mask], age: [mask], HIV: [mask],
+    # Diabetes wo C: [mask],Renal Disease Severe: [mask], Peripheral Vascular Disease:
+    # [mask], Chronic Pulmonary Disease: [mask], Renal Disease Mild Moderate: [mask],
+    # Liver Disease Moderate Severe: [mask], Malignancy: [mask], Diabetes w C: [mask],
+    # Dementia: [mask], Hemiplegia Paraplegia: [mask], Metastatic Solid Tumor: [mask],
+    # Congestive Heart Failure: [mask], Myocardial Infarction: [mask], Peptic Ulcer
+    # Disease: [mask], Cerebrovascular Disease: [mask], Rheumatic Disease: [mask], Liver
+    # Disease Mild: [mask]'
     train_dataset = GatorTron_Dataset(train_df, tokenizer, GATROTRON_MAX_LEN)
     eval_dataset = GatorTron_Dataset(val_df, tokenizer, GATROTRON_MAX_LEN)
     test_dataset = GatorTron_Dataset(test_df, tokenizer, GATROTRON_MAX_LEN)

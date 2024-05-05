@@ -44,7 +44,7 @@ class GatorTron_Dataset(Dataset):
             period_separated_column_concatenation_formatting(row)
             for _, row in self.df.iterrows()
         ]
-        self.labels = [int(label) for label in df["audit.c.score"].tolist()]
+        self.labels = [int(label) for label in self.df["audit.c.score"].tolist()]
 
         self.encodings = tokenizer(
             self.texts, truncation=True, padding="max_length", max_length=max_len
