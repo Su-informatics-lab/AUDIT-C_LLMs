@@ -110,11 +110,11 @@ if __name__ == "__main__":
         if not args.non_linear_head
         else "gatrotron_rgr_demo_como_threeDrug_non_linear_head"
     )
-    print('args ok')
+
     # load dataset and tokenizer
     df = pd.read_parquet(DEMO_COMO_THREE_DRUG_PARQUET_PATH)
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    print('tokenizer ok')
+
     # 1. expand comorbidity into multiple binary ratings for all possible comorbidity
     # 2. ignore 'q1.score', 'q2.score', 'q3.score', 'audit.c.score', 'person_id', and
     # 'split'
@@ -128,11 +128,11 @@ if __name__ == "__main__":
     train_dataset = GatorTron_Dataset(train_df, tokenizer, GATROTRON_MAX_LEN)
     eval_dataset = GatorTron_Dataset(val_df, tokenizer, GATROTRON_MAX_LEN)
     test_dataset = GatorTron_Dataset(test_df, tokenizer, GATROTRON_MAX_LEN)
-    print('data ok')
+
     # init model
     config = AutoConfig.from_pretrained(MODEL_NAME, num_labels=1)  # for regression
     model = GatorTron_Regresser(MODEL_NAME, args.non_linear_head).to(device)
-    print('model ok')
+
     training_args = TrainingArguments(
         output_dir=os.path.join("ckpts", run_name),
         overwrite_output_dir=False,
