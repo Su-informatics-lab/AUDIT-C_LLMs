@@ -163,7 +163,7 @@ if __name__ == "__main__":
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         compute_metrics=compute_metrics,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=20)],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=50)],
     )
 
     # train the model
