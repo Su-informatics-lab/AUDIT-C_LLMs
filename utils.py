@@ -18,7 +18,7 @@ HEAD = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C
 TAIL = "\n### AUDIT-C Score:"
 
 
-def period_separated_column_concatenation_formatting(a_row):
+def period_separated_column_concatenation_formatting(a_row, with_date=True):
     """
     Concatenates all the indicative columns into a single string for LLM consumption.
 
@@ -43,19 +43,24 @@ def period_separated_column_concatenation_formatting(a_row):
         [mask])```
 
     Args:
-        A row in dataframe.
+        a_row: A row in dataframe.
+        with_date: Whether to use date column.
     Returns:
         A string of demographics, comorbidity, and drug use of a specific person.
     """
     formatted_row = []
     drug_data_pairs = []
     for k, v in a_row.items():
-        if k in ['q1.score', 'q2.score', 'q3.score', 'audit.c.score', 'person_id', 'split']:
+        if k in ['q1.score', 'q2.score', 'q3.score',
+                 'audit.c.score', 'person_id', 'split']:
             continue
         elif k.startswith('concept_name'):
             drug_number = k.split('_')[-1]
             drug_exposure_date = a_row[f'drug_exposure_start_date_{drug_number}']
-            drug_data_pairs.append(f'Concept Name: {v} (Exposure Start Date: {drug_exposure_date})')
+            if with_date:
+                drug_data_pairs.append(f'Concept Name: {v} (Exposure Start Date: {drug_exposure_date})')
+            else:
+                drug_data_pairs.append(f'Concept Name: {v}')
         elif k.startswith('drug_exposure_start_date'):
             continue
         else:
@@ -113,14 +118,6 @@ def compute_metrics(eval_pred):
     mse = evaluate_mse(labels, predictions.squeeze())
     c_index = evaluate_c_index(labels, predictions.squeeze())
     return {"mse": mse, "rmse": np.sqrt(mse), "c-index": c_index}
-
-
-def convert_to_dataframe(dataset):
-    df = pd.DataFrame(dataset)
-    # select the relevant features and target variable
-    df = df[["gender", "race", "ethnicity", "age", "comorbidity", "audit.c.score"]]
-    return df
-
 
 def expand_comorbidity(df, comorbidity_col="comorbidity", separator=","):
     """

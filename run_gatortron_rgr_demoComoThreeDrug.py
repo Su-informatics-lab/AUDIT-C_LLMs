@@ -37,11 +37,11 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class GatorTron_Dataset(Dataset):
-    def __init__(self, df, tokenizer, max_len):
+    def __init__(self, df, tokenizer, max_len, with_date):
         self.df = df.reset_index(drop=True)  # drop index
         self.max_len = max_len
         self.texts = [
-            period_separated_column_concatenation_formatting(row)
+            period_separated_column_concatenation_formatting(row, with_date=with_date)
             for _, row in self.df.iterrows()
         ]
         self.labels = [int(label) for label in self.df["audit.c.score"].tolist()]
@@ -104,6 +104,12 @@ if __name__ == "__main__":
         default=False,
         help="whether to use non-linear regression head"
     )
+    parser.add_argument(
+        "--with_date",
+        action='store_true',
+        default=False,
+        help="whether to use date information"
+    )
     args = parser.parse_args()
     run_name = (
         "gatrotron_rgr_demo_como_threeDrug_linear_head"
@@ -120,14 +126,18 @@ if __name__ == "__main__":
     # 'split'
     # 3. regularize 'concept_name_1(_2/_3)' so that the corresponding concept_name and
     # drug_exposure_start_date stay together
-    # e.g., Concept Name: [mask] (Exposure Start Date: [mask])
+    # e.g., Concept Name: [mask] (Exposure Start Date: [mask]), if with_date
+    # else Concept Name: [mask]
     train_df = expand_comorbidity(df.loc[df.split == 'train'])
     val_df = expand_comorbidity(df.loc[df.split == 'validation'])
     test_df = expand_comorbidity(df.loc[df.split == 'test'])
 
-    train_dataset = GatorTron_Dataset(train_df, tokenizer, GATROTRON_MAX_LEN)
-    eval_dataset = GatorTron_Dataset(val_df, tokenizer, GATROTRON_MAX_LEN)
-    test_dataset = GatorTron_Dataset(test_df, tokenizer, GATROTRON_MAX_LEN)
+    train_dataset = GatorTron_Dataset(train_df, tokenizer,
+                                      GATROTRON_MAX_LEN, with_date=args.with_date)
+    eval_dataset = GatorTron_Dataset(val_df, tokenizer,
+                                     GATROTRON_MAX_LEN, with_date=args.with_date)
+    test_dataset = GatorTron_Dataset(test_df, tokenizer,
+                                     GATROTRON_MAX_LEN, with_date=args.with_date)
 
     # init model
     config = AutoConfig.from_pretrained(MODEL_NAME, num_labels=1)  # for regression
