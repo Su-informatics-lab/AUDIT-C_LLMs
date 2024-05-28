@@ -110,12 +110,16 @@ if __name__ == "__main__":
         default=False,
         help="whether to use date information"
     )
-    args = parser.parse_args()
-    run_name = (
-        "gatrotron_rgr_demo_como_threeDrug_linear_head"
-        if not args.non_linear_head
-        else "gatrotron_rgr_demo_como_threeDrug_non_linear_head"
+    parser.add_argument(
+        "--model_name",
+        default=MODEL_NAME,
+        help="which model to use"
     )
+    parser.add_argument(
+        "--run_name",
+        help="like 'gatrotron_rgr_demo_como_threeDrug_linear_head'"
+    )
+    args = parser.parse_args()
 
     # load dataset and tokenizer
     df = pd.read_parquet(DEMO_COMO_THREE_DRUG_PARQUET_PATH)
@@ -144,7 +148,7 @@ if __name__ == "__main__":
     model = GatorTron_Regresser(MODEL_NAME, args.non_linear_head).to(device)
 
     training_args = TrainingArguments(
-        output_dir=os.path.join("ckpts", run_name),
+        output_dir=os.path.join("ckpts", args.run_name),
         overwrite_output_dir=False,
         num_train_epochs=10.0,
         do_train=True,
@@ -164,7 +168,7 @@ if __name__ == "__main__":
         save_total_limit=3,
         remove_unused_columns=True,
     )
-    wandb.init(project=PROJECT_NAME, name=run_name, config=training_args)
+    wandb.init(project=PROJECT_NAME, name=args.run_name, config=training_args)
 
     # initialize Trainer
     trainer = Trainer(
