@@ -27,7 +27,7 @@ __version__ = "0.0.2"
 __license__ = "0BSD"
 
 df = pd.read_csv(CSV_DEMO_COMO_ONLY_PATH)
-train_df, test_df = train_test_split(test_size=5000, random_state=SEED)
+train_df, test_df = train_test_split(df, test_size=5000, random_state=SEED)
 
 train_df_expanded = expand_comorbidity(train_df)
 test_df_expanded = expand_comorbidity(test_df)
