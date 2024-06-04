@@ -3,31 +3,32 @@ Calculate random forest and linear regression baselines for AUDIT-C Scoring task
 """
 
 import numpy as np
-from datasets import load_from_disk
+import pandas as pd
 from lifelines.utils import concordance_index
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import ElasticNet, LinearRegression
-from sklearn.metrics import accuracy_score, mean_squared_error
+from sklearn.metrics import mean_squared_error
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import Ridge
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
 from sklearn.svm import SVR
 
-from utils import DATASET_PATH, SEED, convert_to_dataframe, expand_comorbidity
+from utils import CSV_DEMO_COMO_ONLY_PATH, SEED, expand_comorbidity
 
-dataset = load_from_disk(DATASET_PATH)
+# df = load_from_disk(CSV_DEMO_COMO_ONLY_PATH)
 # define preprocessing for categorical features (one-hot encoding)
 categorical_transformer = OneHotEncoder(handle_unknown="ignore")
 
 
 __author__ = "hw56@indiana.edu"
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 __license__ = "0BSD"
 
+df = pd.read_csv(CSV_DEMO_COMO_ONLY_PATH)
+train_df, test_df = train_test_split(test_size=5000, random_state=SEED)
 
-train_df = convert_to_dataframe(dataset["train"])
-test_df = convert_to_dataframe(dataset["test"])
 train_df_expanded = expand_comorbidity(train_df)
 test_df_expanded = expand_comorbidity(test_df)
 
@@ -97,7 +98,7 @@ ridge_pipeline = Pipeline(
     steps=[
         ("preprocessor", preprocessor),
         ("scaler", StandardScaler()),
-        ("regressor", Ridge())  # Using Ridge regression here
+        ("regressor", Ridge(alhpa=100.0))  # best alpha in grid search over e-2 to e4
     ]
 )
 
