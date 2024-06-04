@@ -1,11 +1,9 @@
 """
 This module fine-tunes a GatorTron model in a regression way to make AUDIT-C scoring.
-It uses the dataset as the `run_gen.py` (which uses a T5 and treat the task as a
-virtually a single-token classification task). It has different input formats compared
-to the T5 scripts.
-
 This model makes use of demographics, comorbidity, and drug to make predictions of
 AUDIT-C scores.
+Instead of predicting the overall AUDIT-C score, it predicts the score for each
+of the three questions.
 """
 
 import argparse
