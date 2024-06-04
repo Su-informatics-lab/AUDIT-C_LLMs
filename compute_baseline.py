@@ -100,7 +100,7 @@ ridge_pipeline = Pipeline(
     steps=[
         ("preprocessor", preprocessor),
         ("scaler", StandardScaler()),
-        ("regressor", Ridge(alhpa=100.0))  # best alpha in grid search over e-2 to e4
+        ("regressor", Ridge(alpha=100.0))  # best alpha in grid search over e-2 to e4
     ]
 )
 
