@@ -119,6 +119,25 @@ def compute_metrics(eval_pred):
     c_index = evaluate_c_index(labels, predictions.squeeze())
     return {"mse": mse, "rmse": np.sqrt(mse), "c-index": c_index}
 
+
+def compute_metrics_fine_grained(eval_pred):
+    """
+    Compute eval metrics during training, required by Trainer.
+    :param eval_pred: A tuple containing predictions and labels.
+    :return: A dictionary with computed metrics.
+    """
+    predictions, labels = eval_pred
+    # Ensure predictions and labels are of the correct shape
+    predictions = predictions.reshape(-1, 3)
+    labels = labels.reshape(-1, 3)
+
+    mse = evaluate_mse(labels, predictions)
+    rmse = np.sqrt(mse)
+    c_index = evaluate_c_index(labels, predictions)
+
+    return {"mse": mse, "rmse": rmse, "c-index": c_index}
+
+
 def expand_comorbidity(df, comorbidity_col="comorbidity", separator=","):
     """
     Expand the comorbidity column into multiple binary features.
