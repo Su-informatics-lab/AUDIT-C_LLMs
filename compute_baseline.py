@@ -27,6 +27,8 @@ __version__ = "0.0.2"
 __license__ = "0BSD"
 
 df = pd.read_csv(CSV_DEMO_COMO_ONLY_PATH)
+columns_to_keep = ['gender', 'race', 'ethnicity', 'age', 'comorbidity', 'audit.c.score']
+df = df[columns_to_keep]
 train_df, test_df = train_test_split(df, test_size=5000, random_state=SEED)
 
 train_df_expanded = expand_comorbidity(train_df)
