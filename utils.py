@@ -131,11 +131,27 @@ def compute_metrics_fine_grained(eval_pred):
     predictions = predictions.reshape(-1, 3)
     labels = labels.reshape(-1, 3)
 
+    # Compute metrics for individual scores
     mse = evaluate_mse(labels, predictions)
     rmse = np.sqrt(mse)
     c_index = evaluate_c_index(labels.flatten(), predictions.flatten())
 
-    return {"mse": mse, "rmse": rmse, "c-index": c_index}
+    # Compute overall AUDIT-C score metrics
+    overall_pred = predictions.sum(axis=1)
+    overall_true = labels.sum(axis=1)
+
+    overall_mse = evaluate_mse(overall_true, overall_pred)
+    overall_rmse = np.sqrt(overall_mse)
+    overall_c_index = evaluate_c_index(overall_true, overall_pred)
+
+    return {
+        "mse": mse,
+        "rmse": rmse,
+        "c-index": c_index,
+        "overall_mse": overall_mse,
+        "overall_rmse": overall_rmse,
+        "overall_c-index": overall_c_index
+    }
 
 
 def expand_comorbidity(df, comorbidity_col="comorbidity", separator=","):
