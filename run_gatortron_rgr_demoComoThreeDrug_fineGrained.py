@@ -155,7 +155,7 @@ if __name__ == "__main__":
         do_train=True,
         do_eval=True,
         do_predict=True,
-        evaluation_strategy="steps",
+        eval_strategy="steps",
         auto_find_batch_size=True,
         gradient_accumulation_steps=4,
         learning_rate=3e-4,
