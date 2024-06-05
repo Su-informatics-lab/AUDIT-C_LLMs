@@ -145,12 +145,12 @@ def compute_metrics_fine_grained(eval_pred):
     overall_c_index = evaluate_c_index(overall_true, overall_pred)
 
     return {
-        "mse": mse,
-        "rmse": rmse,
-        "c-index": c_index,
-        "overall_mse": overall_mse,
-        "overall_rmse": overall_rmse,
-        "overall_c-index": overall_c_index
+        "individual_mse": mse,
+        "individual_rmse": rmse,
+        "individual_c-index": c_index,
+        "mse": overall_mse,
+        "rmse": overall_rmse,
+        "c-index": overall_c_index
     }
 
 
