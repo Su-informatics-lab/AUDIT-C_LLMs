@@ -149,6 +149,7 @@ if __name__ == "__main__":
     model = GatorTron_Regresser(MODEL_NAME, args.non_linear_head).to(device)
 
     training_args = TrainingArguments(
+        run_name=args.run_name,
         output_dir=os.path.join("ckpts", args.run_name),
         overwrite_output_dir=False,
         num_train_epochs=10.0,
