@@ -133,7 +133,7 @@ def compute_metrics_fine_grained(eval_pred):
 
     mse = evaluate_mse(labels, predictions)
     rmse = np.sqrt(mse)
-    c_index = evaluate_c_index(labels, predictions)
+    c_index = evaluate_c_index(labels.flatten(), predictions.flatten())
 
     return {"mse": mse, "rmse": rmse, "c-index": c_index}
 

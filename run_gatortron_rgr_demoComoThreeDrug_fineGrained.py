@@ -112,7 +112,7 @@ if __name__ == "__main__":
         help="whether to use date information"
     )
     parser.add_argument(
-        "--model_name",
+        "`--model_name`",
         default=MODEL_NAME,
         help="which model to use"
     )
