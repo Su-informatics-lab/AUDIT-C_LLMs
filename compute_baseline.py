@@ -36,13 +36,15 @@ if __name__ == "__main__":
 
     # read in data
     df = pd.read_parquet(DEMO_COMO_THREE_DRUG_PARQUET_PATH)
-    columns_to_keep = ['gender', 'race', 'ethnicity', 'age', 'comorbidity', 'audit.c.score']
+    columns_to_keep = ['gender', 'race', 'ethnicity', 'age', 'comorbidity', 'audit.c.score', 'split']
     if args.with_drug:
         columns_to_keep.extend(['concept_name_1', 'concept_name_2', 'concept_name_3'])
 
     df = df[columns_to_keep]
-    train_df_expanded = expand_comorbidity(df.loc[df['split'] == 'train'])
-    test_df_expanded = expand_comorbidity(df.loc[df['split'] == 'test'])
+    train_df = df[df['split'] == 'train'].drop(columns=['split'])
+    test_df = df[df['split'] == 'test'].drop(columns=['split'])
+    train_df_expanded = expand_comorbidity(train_df)
+    test_df_expanded = expand_comorbidity(test_df)
 
     # fixme: debug print
     print("Columns in train_df_expanded:", train_df_expanded.columns)
