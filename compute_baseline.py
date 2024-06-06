@@ -41,8 +41,8 @@ if __name__ == "__main__":
         columns_to_keep.extend(['concept_name_1', 'concept_name_2', 'concept_name_3'])
 
     df = df[columns_to_keep]
-    train_df_expanded = expand_comorbidity(df.loc[df.split == 'train'])
-    test_df_expanded = expand_comorbidity(df.loc[df.split == 'test'])
+    train_df_expanded = expand_comorbidity(df.loc[df['split'] == 'train'])
+    test_df_expanded = expand_comorbidity(df.loc[df['split'] == 'test'])
 
     # fixme: debug print
     print("Columns in train_df_expanded:", train_df_expanded.columns)
