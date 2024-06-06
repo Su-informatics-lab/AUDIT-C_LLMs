@@ -43,6 +43,10 @@ if __name__ == "__main__":
     train_df_expanded = expand_comorbidity(df.loc[df.split == 'train'])
     test_df_expanded = expand_comorbidity(df.loc[df.split == 'test'])
 
+    # fixme: debug print
+    print("Columns in train_df_expanded:", train_df_expanded.columns)
+    print("Columns in test_df_expanded:", test_df_expanded.columns)
+
     # separate features and target variable
     X_train = train_df_expanded.drop("audit.c.score", axis=1)
     y_train = train_df_expanded["audit.c.score"]
@@ -53,6 +57,7 @@ if __name__ == "__main__":
     categorical_features = ["gender", "race", "ethnicity"]
     if args.with_drug:
         categorical_features.extend(['concept_name_1', 'concept_name_2', 'concept_name_3'])
+
     # define preprocessing for categorical features (one-hot encoding)
     categorical_transformer = OneHotEncoder(handle_unknown="ignore")
     preprocessor = ColumnTransformer(
