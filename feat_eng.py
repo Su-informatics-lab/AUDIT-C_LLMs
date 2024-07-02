@@ -273,21 +273,21 @@ for comorbidities in df_matched['comorbidity']:
         unique_comorbidities.update(comorbidities.split(','))
 assert len(unique_comorbidities) == 18
 
-# encode only once
-if not os.path.exists(DEMO_COMO_6MON_DRUG_PARQUET_PATH):
-    # encode comorbidity
-    # init df_matched with binary comorbidities as 0
-    for comorbidity in unique_comorbidities:
-        df_matched[comorbidity] = 0
-    # populate it
-    for index, row in tqdm(df_matched.iterrows()):
-        if row['comorbidity'] is not None:
-            for comorbidity in row['comorbidity'].split(','):
-                df_matched.at[index, comorbidity] = 1
-    # encode drug
-    df_matched = expand_drugs_to_binary_columns(df_matched)
-else:
-    pd.read_parquet(DEMO_COMO_6MON_DRUG_PARQUET_PATH)
+# # encode only once
+# if not os.path.exists(DEMO_COMO_6MON_DRUG_PARQUET_PATH):
+#     # encode comorbidity
+#     # init df_matched with binary comorbidities as 0
+#     for comorbidity in unique_comorbidities:
+#         df_matched[comorbidity] = 0
+#     # populate it
+#     for index, row in tqdm(df_matched.iterrows()):
+#         if row['comorbidity'] is not None:
+#             for comorbidity in row['comorbidity'].split(','):
+#                 df_matched.at[index, comorbidity] = 1
+#     # encode drug
+#     df_matched = expand_drugs_to_binary_columns(df_matched)
+# else:
+df_matched = pd.read_parquet(DEMO_COMO_6MON_DRUG_PARQUET_PATH)
 
 ###
 # 2. Volcano Plot
@@ -300,7 +300,7 @@ else:
 ###
 
 # remember to drop columns not needed
-rm_columns = ['q1.score', 'q2.score', 'q3.score', 'person_id', 'comorbidity']
+rm_columns = ['q1.score', 'q2.score', 'q3.score', 'person_id', 'comorbidity', 'STANDARD_CONCEPT_NAME'.lower()]
 df_matched = df_matched.drop(columns=rm_columns)
 
 volcano_df, _, _, _, _, _ = prepare_volcano_data(df_matched,
