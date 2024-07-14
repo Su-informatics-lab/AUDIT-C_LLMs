@@ -1,4 +1,5 @@
 import argparse
+
 import numpy as np
 import pandas as pd
 import torch
@@ -18,12 +19,14 @@ torch.manual_seed(SEED)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
+
 def save_model(model, eval_loss, top_models, run_name):
     model_path = f"ckpts/{run_name}/model_{eval_loss:.4f}.pt"
     torch.save(model.state_dict(), model_path)
     top_models.append((eval_loss, model_path))
     top_models = sorted(top_models, key=lambda x: x[0])[:3]  # Keep only top 3 models
     return top_models
+
 
 if __name__ == "__main__":
     torch.manual_seed(SEED)
@@ -32,8 +35,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--features",
-        choices=['demoComo', 'demoComoAccumulativeDrugs'],
-        help="which features to use"
+        choices=["demoComo", "demoComoAccumulativeDrugs"],
+        help="which features to use",
     )
     args = parser.parse_args()
     # initialize wandb
@@ -74,9 +77,14 @@ if __name__ == "__main__":
     if args.features == "demoComo":
         continuous_features = ["age"]
         all_features = categorical_features + ["age", "audit.c.score"]
-    elif args.features == 'demoComoAccumulativeDrugs':
-        continuous_features = ["age", 'pos_log2FC', 'neg_log2FC']
-        all_features = categorical_features + ["age", 'pos_log2FC', 'neg_log2FC', "audit.c.score"]
+    elif args.features == "demoComoAccumulativeDrugs":
+        continuous_features = ["age", "pos_log2FC", "neg_log2FC"]
+        all_features = categorical_features + [
+            "age",
+            "pos_log2FC",
+            "neg_log2FC",
+            "audit.c.score",
+        ]
 
     df_train = df.loc[df["split"] == "train"][all_features]
     df_val = df.loc[df["split"] == "validation"][all_features]
@@ -110,9 +118,9 @@ if __name__ == "__main__":
     x_categ_test = torch.tensor(
         df_test[categorical_features].values, dtype=torch.long
     ).to(device)
-    x_cont_test = torch.tensor(df_test[continuous_features].values, dtype=torch.float).to(
-        device
-    )
+    x_cont_test = torch.tensor(
+        df_test[continuous_features].values, dtype=torch.float
+    ).to(device)
     y_test = (
         torch.tensor(df_test["audit.c.score"].values, dtype=torch.float)
         .unsqueeze(1)
@@ -120,7 +128,9 @@ if __name__ == "__main__":
     )
 
     cont_mean_std = (
-        torch.Tensor([df_train[continuous_features].mean(), df_train[continuous_features].std()])
+        torch.Tensor(
+            [df_train[continuous_features].mean(), df_train[continuous_features].std()]
+        )
         .reshape(-1, 2)
         .to(device)
     )
@@ -137,7 +147,10 @@ if __name__ == "__main__":
         heads=8,  # num heads, paper recommends 8
         dim_head=16,  # num heads
         dim_out=1,  # out dim, but could be anything
-        mlp_hidden_mults=(4, 2),  # relative multiples of each hidden dimension of the last mlp to logits
+        mlp_hidden_mults=(
+            4,
+            2,
+        ),  # relative multiples of each hidden dimension of the last mlp to logits
         mlp_act=nn.SiLU(),  # activation for final mlp, defaults to relu, but could be anything else (selu etc)
         num_special_tokens=0,
         continuous_mean_std=cont_mean_std,
@@ -207,7 +220,13 @@ if __name__ == "__main__":
         eval_labels = np.concatenate(eval_labels)
         eval_loss = mean_squared_error(eval_labels, eval_preds)
         eval_metrics = compute_metrics((eval_preds, eval_labels))
-        wandb.log({"epoch": epoch + 1, "eval_loss": eval_loss, **{f"eval/{k}": v for k, v in eval_metrics.items()}})
+        wandb.log(
+            {
+                "epoch": epoch + 1,
+                "eval_loss": eval_loss,
+                **{f"eval/{k}": v for k, v in eval_metrics.items()},
+            }
+        )
 
         if eval_loss < best_eval_loss:
             best_eval_loss = eval_loss
@@ -242,4 +261,6 @@ if __name__ == "__main__":
 
     print(f"Test Loss: {test_loss:.4f}")
     print(f"Test Metrics: {test_metrics}")
-    wandb.log({"test_loss": test_loss, **{f"test/{k}": v for k, v in test_metrics.items()}})
+    wandb.log(
+        {"test_loss": test_loss, **{f"test/{k}": v for k, v in test_metrics.items()}}
+    )
