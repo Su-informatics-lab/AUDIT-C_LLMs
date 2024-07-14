@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 import pandas as pd
 import torch
@@ -11,25 +12,33 @@ from torch.utils.data import DataLoader, RandomSampler, TensorDataset
 from tabtransformer import TabTransformer
 from utils import PROJECT_NAME, SEED, compute_metrics
 
-# initialize wandb
-wandb.init(project=PROJECT_NAME, name="tabTransformer")
-
 # for reproducibility
 torch.manual_seed(SEED)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-
-def save_model(model, eval_loss, top_models):
-    model_path = f"model_{eval_loss:.4f}.pt"
+def save_model(model, eval_loss, top_models, run_name):
+    model_path = f"ckpts/{run_name}/model_{eval_loss:.4f}.pt"
     torch.save(model.state_dict(), model_path)
     top_models.append((eval_loss, model_path))
     top_models = sorted(top_models, key=lambda x: x[0])[:3]  # Keep only top 3 models
     return top_models
 
-
 if __name__ == "__main__":
+    torch.manual_seed(SEED)
+    parser = argparse.ArgumentParser(
+        description="Train a TabTransformer for AUDIT-C Scoring."
+    )
+    parser.add_argument(
+        "--features",
+        choices=['demoComo', 'demoComoAccumulativeDrugs'],
+        help="which features to use"
+    )
+    args = parser.parse_args()
+    # initialize wandb
+    run_name = f"TabTransformer_{args.features}"
+    wandb.init(project=PROJECT_NAME, name=run_name)
     ### prepare data
     AUDIT_C_SCORING_212K_ALL_FEATURES_W_ACCUMULATED_LOG2FC_PATH = (
         "gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56"
@@ -38,7 +47,7 @@ if __name__ == "__main__":
     df = pd.read_parquet(AUDIT_C_SCORING_212K_ALL_FEATURES_W_ACCUMULATED_LOG2FC_PATH)
 
     # reserve data we used for this run
-    demoComo = [
+    categorical_features = [
         "Metastatic_Solid_Tumor",
         "Dementia",
         "Peripheral_Vascular_Disease",
@@ -60,62 +69,75 @@ if __name__ == "__main__":
         "gender",
         "race",
         "ethnicity",
-        "age",
-        "audit.c.score",
     ]
-    assert len(demoComo) == 22 + 1
-    # df_demoComo = df[demoComo]
 
-    df_demoComo_train = df.loc[df["split"] == "train"][demoComo]
-    df_demoComo_test = df.loc[df["split"] == "test"][demoComo]
+    if args.features == "demoComo":
+        continuous_features = ["age"]
+        all_features = categorical_features + ["age", "audit.c.score"]
+    elif args.features == 'demoComoAccumulativeDrugs':
+        continuous_features = ["age", 'pos_log2FC', 'neg_log2FC']
+        all_features = categorical_features + ["age", 'pos_log2FC', 'neg_log2FC', "audit.c.score"]
 
-    # Convert the train and test sets to tensors
+    df_train = df.loc[df["split"] == "train"][all_features]
+    df_val = df.loc[df["split"] == "validation"][all_features]
+    df_test = df.loc[df["split"] == "test"][all_features]
+
+    # convert the train, validation, and test sets to tensors
     x_categ_train = torch.tensor(
-        df_demoComo_train[demoComo[:-2]].values, dtype=torch.long
+        df_train[categorical_features].values, dtype=torch.long
     ).to(device)
     x_cont_train = torch.tensor(
-        df_demoComo_train[["age"]].values, dtype=torch.float
+        df_train[continuous_features].values, dtype=torch.float
     ).to(device)
     y_train = (
-        torch.tensor(df_demoComo_train["audit.c.score"].values, dtype=torch.float)
+        torch.tensor(df_train["audit.c.score"].values, dtype=torch.float)
+        .unsqueeze(1)
+        .to(device)
+    )
+
+    x_categ_val = torch.tensor(
+        df_val[categorical_features].values, dtype=torch.long
+    ).to(device)
+    x_cont_val = torch.tensor(df_val[continuous_features].values, dtype=torch.float).to(
+        device
+    )
+    y_val = (
+        torch.tensor(df_val["audit.c.score"].values, dtype=torch.float)
         .unsqueeze(1)
         .to(device)
     )
 
     x_categ_test = torch.tensor(
-        df_demoComo_test[demoComo[:-2]].values, dtype=torch.long
+        df_test[categorical_features].values, dtype=torch.long
     ).to(device)
-    x_cont_test = torch.tensor(df_demoComo_test[["age"]].values, dtype=torch.float).to(
+    x_cont_test = torch.tensor(df_test[continuous_features].values, dtype=torch.float).to(
         device
     )
     y_test = (
-        torch.tensor(df_demoComo_test["audit.c.score"].values, dtype=torch.float)
+        torch.tensor(df_test["audit.c.score"].values, dtype=torch.float)
         .unsqueeze(1)
         .to(device)
     )
 
     cont_mean_std = (
-        torch.Tensor([df_demoComo_train["age"].mean(), df_demoComo_train["age"].std()])
+        torch.Tensor([df_train[continuous_features].mean(), df_train[continuous_features].std()])
         .reshape(-1, 2)
         .to(device)
     )
 
     # find out unique values in each column for categorical values
-    categories = []
-    for c in df_demoComo_train.columns[:-2]:
-        categories.append(len(df_demoComo_train[c].unique()))
-    assert len(categories) == 21  # 21 cats
-    ###
+    categories = [len(df_train[c].unique()) for c in categorical_features]
+    assert len(categories) == len(categorical_features)
 
     model = TabTransformer(
         categories=categories,  # tuple containing the number of unique values within each category
-        num_continuous=1,  # number of continuous values
+        num_continuous=len(continuous_features),  # number of continuous values
         dim=32,  # input/cat_embedding dimension, paper set at 32
         depth=6,  # num transformer layers, paper recommended 6
         heads=8,  # num heads, paper recommends 8
         dim_head=16,  # num heads
         dim_out=1,  # out dim, but could be anything
-        mlp_hidden_mults=(4,2),  # relative multiples of each hidden dimension of the last mlp to logits
+        mlp_hidden_mults=(4, 2),  # relative multiples of each hidden dimension of the last mlp to logits
         mlp_act=nn.SiLU(),  # activation for final mlp, defaults to relu, but could be anything else (selu etc)
         num_special_tokens=0,
         continuous_mean_std=cont_mean_std,
@@ -132,10 +154,12 @@ if __name__ == "__main__":
     batch_size = 16
 
     train_dataset = TensorDataset(x_categ_train, x_cont_train, y_train)
+    val_dataset = TensorDataset(x_categ_val, x_cont_val, y_val)
     test_dataset = TensorDataset(x_categ_test, x_cont_test, y_test)
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, sampler=RandomSampler(train_dataset)
     )
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     # early stopping and model saving settings
@@ -174,21 +198,21 @@ if __name__ == "__main__":
         eval_preds = []
         eval_labels = []
         with torch.no_grad():
-            for x_categ_batch, x_cont_batch, y_batch in test_loader:
-                pred_test = model(x_categ_batch, x_cont_batch)
-                eval_preds.append(pred_test.cpu().numpy())
+            for x_categ_batch, x_cont_batch, y_batch in val_loader:
+                pred_val = model(x_categ_batch, x_cont_batch)
+                eval_preds.append(pred_val.cpu().numpy())
                 eval_labels.append(y_batch.cpu().numpy())
 
         eval_preds = np.concatenate(eval_preds)
         eval_labels = np.concatenate(eval_labels)
         eval_loss = mean_squared_error(eval_labels, eval_preds)
         eval_metrics = compute_metrics((eval_preds, eval_labels))
-        wandb.log({"epoch": epoch + 1, "eval_loss": eval_loss, **eval_metrics})
+        wandb.log({"epoch": epoch + 1, "eval_loss": eval_loss, **{f"eval/{k}": v for k, v in eval_metrics.items()}})
 
         if eval_loss < best_eval_loss:
             best_eval_loss = eval_loss
             early_stopping_counter = 0
-            top_models = save_model(model, eval_loss, top_models)
+            top_models = save_model(model, eval_loss, top_models, run_name)
         else:
             early_stopping_counter += 1
             if early_stopping_counter >= early_stopping_steps:
@@ -218,22 +242,4 @@ if __name__ == "__main__":
 
     print(f"Test Loss: {test_loss:.4f}")
     print(f"Test Metrics: {test_metrics}")
-    wandb.log({"test_loss": test_loss, **test_metrics})
-
-    # model = TabTransformer(
-    #     categories=categories,
-    #
-    #     num_continuous=1,  # number of continuous values
-    #     dim=32,  # dimension, paper set at 32
-    #     dim_out=1,  # binary prediction, but could be anything
-    #     depth=6,  # depth, paper recommended 6
-    #     heads=8,  # heads, paper recommends 8
-    #     attn_dropout=0.1,  # post-attention dropout
-    #     ff_dropout=0.1,  # feed forward dropout
-    #     mlp_hidden_mults=(4, 2),
-    #     # relative multiples of each hidden dimension of the last mlp to logits
-    #     mlp_act=nn.ReLU(),
-    #     # activation for final mlp, defaults to relu, but could be anything else (selu etc)
-    #     continuous_mean_std=cont_mean_std
-    #     # (optional) - normalize the continuous values before layer norm
-    # ).to(device)
+    wandb.log({"test_loss": test_loss, **{f"test/{k}": v for k, v in test_metrics.items()}})
