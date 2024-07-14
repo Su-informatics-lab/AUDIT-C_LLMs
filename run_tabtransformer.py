@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import numpy as np
 import pandas as pd
@@ -21,7 +22,9 @@ print(f"Using device: {device}")
 
 
 def save_model(model, eval_loss, top_models, run_name):
-    model_path = f"ckpts/{run_name}/model_{eval_loss:.4f}.pt"
+    model_dir = f"ckpts/{run_name}"
+    os.makedirs(model_dir, exist_ok=True)
+    model_path = f"{model_dir}/model_{eval_loss:.4f}.pt"
     torch.save(model.state_dict(), model_path)
     top_models.append((eval_loss, model_path))
     top_models = sorted(top_models, key=lambda x: x[0])[:3]  # Keep only top 3 models
@@ -41,7 +44,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # initialize wandb
     run_name = f"TabTransformer_{args.features}"
-    wandb.init(project=PROJECT_NAME, name=run_name)
+    try:
+        wandb.init(project=PROJECT_NAME, name=run_name)
+    except wandb.errors.CommError:
+        print("WandB communication error, proceeding without logging.")
+
     ### prepare data
     AUDIT_C_SCORING_212K_ALL_FEATURES_W_ACCUMULATED_LOG2FC_PATH = (
         "gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56"
@@ -129,7 +136,10 @@ if __name__ == "__main__":
 
     cont_mean_std = (
         torch.Tensor(
-            [df_train[continuous_features].mean(), df_train[continuous_features].std()]
+            [
+                df_train[continuous_features].mean().values,
+                df_train[continuous_features].std().values,
+            ]
         )
         .reshape(-1, 2)
         .to(device)
