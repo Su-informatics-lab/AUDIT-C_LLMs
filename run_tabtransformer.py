@@ -136,7 +136,7 @@ if __name__ == "__main__":
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, sampler=RandomSampler(train_dataset)
     )
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
     # early stopping and model saving settings
     early_stopping_steps = 50
