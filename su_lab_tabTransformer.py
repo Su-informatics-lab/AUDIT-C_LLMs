@@ -84,7 +84,7 @@ class TabTransformer(nn.Module):
                                                  dropout=attn_dropout)
         self.transformer = TransformerEncoder(encoder_layers, num_layers=depth)
 
-        input_size = (dim * self.num_categories) + num_continuous + (dim * num_high_card_categories)
+        input_size = dim * (self.num_categories + num_high_card_categories)
         hidden_dimensions = [input_size * t for t in mlp_hidden_mults]
         all_dimensions = [input_size, *hidden_dimensions, dim_out]
 
@@ -116,8 +116,12 @@ class TabTransformer(nn.Module):
                 shared_categ_embed = self.shared_category_embed.unsqueeze(0).repeat(categ_embed.shape[0], 1, 1)
                 categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
 
-            x = self.transformer(categ_embed)
-            flat_categ = x.flatten(start_dim=1)
+        if self.use_lm_embeddings:
+            lm_cat_proj = self.get_lm_embeddings(x_high_card_categ)
+            categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
+
+        x = self.transformer(categ_embed)
+        flat_categ = x.flatten(start_dim=1)
 
         if self.num_continuous > 0:
             if self.continuous_mean_std is not None:
@@ -126,11 +130,7 @@ class TabTransformer(nn.Module):
 
             normed_cont = self.cont_norm(x_cont)
 
-        # project LM embeddings to `dim` for high-cardinality categorical variables
-        if self.use_lm_embeddings:
-            lm_cat_proj = self.get_lm_embeddings(x_high_card_categ)
-
-        x = torch.cat((flat_categ, normed_cont, lm_cat_proj), dim=1)
+        x = torch.cat((flat_categ, normed_cont), dim=1)
         logits = self.mlp(x)
 
         return logits
@@ -161,13 +161,9 @@ class TabTransformer(nn.Module):
         new_texts = []
 
         for texts in x_high_card_categ.values:
-            embeddings_for_row = []
             for text in texts:
-                if text in self.embeddings_cache:
-                    embeddings_for_row.append(self.embeddings_cache[text])
-                else:
+                if text not in self.embeddings_cache:
                     new_texts.append(text)
-            embeddings.append(embeddings_for_row)
 
         if new_texts:
             new_embeddings = self.compute_embeddings(new_texts)
@@ -179,7 +175,9 @@ class TabTransformer(nn.Module):
 
         # convert to tensor
         embeddings = [[self.embeddings_cache[text] for text in texts] for texts in x_high_card_categ.values]
-        return torch.tensor(embeddings, dtype=torch.float32)
+        embeddings = np.array(embeddings)  # convert to a numpy array
+        embeddings = torch.tensor(embeddings, dtype=torch.float32)  # convert to a tensor
+        return embeddings
 
     def compute_embeddings(self, texts):
         inputs = self.tokenizer(texts, return_tensors='pt', truncation=True, padding=True, max_length=512)
