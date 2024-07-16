@@ -44,7 +44,7 @@ class CatTransformer(nn.Module):
             continuous_mean_std: torch.Tensor = None,  # precomputed mean/std for continuous variables
             transformer_dropout: float = 0.1,  # dropout for attention and residual links
             use_shared_categ_embed: bool = True,  # share a fixed-length embeddings indicating the levels from the same column
-            shared_categ_dim_divisor: int = 8,  # 1/8 of cat_embedding dims are shared in TabTransformer
+            shared_categ_dim_divisor: int = 8,  # 1/8 of cat_embedding dims are shared in CatTransformer
             lm_model_name: str = 'distilbert/distilbert-base-uncased',  # Hugging Face BERT variant model name, and we recommend `Su-informatics-lab/gatortron_base_rxnorm_babbage_v2`
             lm_max_length: int = 512,  # max tokens for LM embedding computation
             embeddings_cache_path: str = '.lm_embeddings.pkl'  # path to cache embeddings
