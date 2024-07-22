@@ -146,12 +146,13 @@ class CatTransformer(nn.Module):
             categ_embed = self.category_embed(x_categ)
 
             if self.use_shared_categ_embed:
-                shared_categ_embed = self.shared_category_embed.unsqueeze(0).repeat(
-                    categ_embed.shape[0], 1, 1)
+                shared_categ_embed = self.shared_category_embed.unsqueeze(0).repeat(categ_embed.shape[0], 1, 1)
+                shared_categ_embed = shared_categ_embed.to(device)
                 categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
 
         if self.use_lm_embeddings and self.num_high_card_categories > 0:
             lm_cat_proj = self.get_lm_embeddings(x_high_card_categ)
+            lm_cat_proj = lm_cat_proj.to(device)
             categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
 
         x = self.transformer(categ_embed)
