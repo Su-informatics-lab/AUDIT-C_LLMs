@@ -32,7 +32,7 @@ class CatTransformer(nn.Module):
             self,
             *,
             categories: tuple,  # tuple containing the number of unique values (i.e., levels) within each easily encodable category (categories of low cardinality)
-            num_high_card_categories: int,  # number of high-cardinality variables whose levels need to be derived from an LM
+            num_high_card_categories: int,  # number of high-cardinality variables whose levels need to be derived from an LM; if set to 0, if falls back to a TabTransformer (https://arxiv.org/abs/2012.06678)
             num_continuous: int,  # number of continuous variables
             dim: int,  # input dimension/embedding size, paper set at 32
             depth: int = 6,  # number of stacking transformer blocks, paper recommended 6
@@ -56,7 +56,7 @@ class CatTransformer(nn.Module):
         self.num_categories = len(categories)
         self.num_high_card_categories = num_high_card_categories
         self.num_unique_categories = sum(categories)
-        self.use_lm_embeddings = lm_model_name is not None
+        self.use_lm_embeddings = lm_model_name is not None and num_high_card_categories > 0
         self.dim = dim
         self.lm_max_length = lm_max_length
 
@@ -107,11 +107,13 @@ class CatTransformer(nn.Module):
             self.embeddings_cache_path = embeddings_cache_path
             self.embeddings_cache = self.load_embeddings_cache()
 
-    def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor, x_high_card_categ: pd.DataFrame) -> torch.Tensor:
+    def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor, x_high_card_categ: pd.DataFrame = None) -> torch.Tensor:
         # sanity check
         assert x_categ.shape[1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
         assert x_cont.shape[1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
-        assert x_high_card_categ.shape[1] == self.num_high_card_categories, f'You must pass in {self.num_high_card_categories} high-cardinality category values'
+        if self.num_high_card_categories > 0:
+            assert x_high_card_categ is not None, 'You must pass in high-cardinality category values'
+            assert x_high_card_categ.shape[1] == self.num_high_card_categories, f'You must pass in {self.num_high_card_categories} high-cardinality category values'
 
         # handle missing data in categorical variables
         x_categ = self.handle_missing_data(x_categ)
@@ -124,7 +126,7 @@ class CatTransformer(nn.Module):
                 shared_categ_embed = self.shared_category_embed.unsqueeze(0).repeat(categ_embed.shape[0], 1, 1)
                 categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
 
-        if self.use_lm_embeddings:
+        if self.use_lm_embeddings and self.num_high_card_categories > 0:
             lm_cat_proj = self.get_lm_embeddings(x_high_card_categ)
             categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
 
@@ -137,8 +139,10 @@ class CatTransformer(nn.Module):
                 x_cont = (x_cont - mean) / std
 
             normed_cont = self.cont_norm(x_cont)
+            x = torch.cat((flat_categ, normed_cont), dim=1)
+        else:
+            x = flat_categ
 
-        x = torch.cat((flat_categ, normed_cont), dim=1)
         logits = self.mlp(x)
 
         return logits
@@ -181,18 +185,15 @@ class CatTransformer(nn.Module):
             self.save_embeddings_cache()
 
         # convert to tensor
-        embeddings = [[self.embeddings_cache[text] for text in texts] for texts in
-                      x_high_card_categ.values]
+        embeddings = [[self.embeddings_cache[text] for text in texts] for texts in x_high_card_categ.values]
         embeddings = np.array(embeddings)
-        embeddings = torch.tensor(embeddings,
-                                  dtype=torch.float32)
+        embeddings = torch.tensor(embeddings, dtype=torch.float32)
         return embeddings
 
     def compute_embeddings(self, texts: list) -> torch.Tensor:
         embeddings = []
         for text in tqdm(texts, desc="Computing LM embeddings"):
-            inputs = self.tokenizer(text, return_tensors='pt', truncation=True,
-                                    padding=True, max_length=self.lm_max_length)
+            inputs = self.tokenizer(text, return_tensors='pt', truncation=True, padding=True, max_length=self.lm_max_length)
             outputs = self.lm_model(**inputs)
             # fixme: only support [CLS] token embedding for now
             cls_embedding = outputs.last_hidden_state[:, 0, :].detach().numpy()
