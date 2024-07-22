@@ -31,7 +31,7 @@ class CatTransformer(nn.Module):
     def __init__(
             self,
             *,
-            categories: tuple,  # tuple containing the number of unique values (i.e., levels) within each easily encodable category (categories of low cardinality)
+            categories: list,  # a list containing the number of unique values (i.e., levels) within each easily encodable category (categories of low cardinality)
             num_high_card_categories: int,  # number of high-cardinality variables whose levels need to be derived from an LM; if set to 0, if falls back to a TabTransformer (https://arxiv.org/abs/2012.06678)
             num_continuous: int,  # number of continuous variables
             dim: int,  # input dimension/embedding size, paper set at 32
