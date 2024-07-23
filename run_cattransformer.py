@@ -179,9 +179,6 @@ if __name__ == "__main__":
             x_cont_batch = x_cont_batch.to(device)
             y_batch = y_batch.to(device)
 
-            if args.with_drug_string:
-                x_high_card_batch = [texts for texts in x_high_card_batch]
-
             optimizer.zero_grad()
             pred_train = model(x_categ_batch, x_cont_batch, x_high_card_batch)
             loss = criterion(pred_train, y_batch)
@@ -209,9 +206,6 @@ if __name__ == "__main__":
                         x_categ_batch = x_categ_batch.to(device)
                         x_cont_batch = x_cont_batch.to(device)
                         y_batch = y_batch.to(device)
-
-                        if args.with_drug_string:
-                            x_high_card_batch = [texts for texts in x_high_card_batch]
 
                         pred_val = model(x_categ_batch, x_cont_batch, x_high_card_batch)
                         eval_preds.append(pred_val.cpu().numpy())
@@ -253,9 +247,6 @@ if __name__ == "__main__":
             x_categ_batch = x_categ_batch.to(device)
             x_cont_batch = x_cont_batch.to(device)
             y_batch = y_batch.to(device)
-
-            if args.with_drug_string:
-                x_high_card_batch = [texts for texts in x_high_card_batch]
 
             pred_test = model(x_categ_batch, x_cont_batch, x_high_card_batch)
             test_preds.append(pred_test.cpu().numpy())
