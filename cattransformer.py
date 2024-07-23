@@ -17,7 +17,6 @@ import os
 import pickle
 
 import numpy as np
-import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -137,7 +136,7 @@ class CatTransformer(nn.Module):
         if self.num_high_card_categories > 0:
             assert x_high_card_categ is not None, 'You must pass in high-cardinality category values'
             assert len(x_high_card_categ) == x_categ.shape[
-                0], f'The batch size of high-cardinality features must match the categorical features batch size'
+                0], 'The batch size of high-cardinality features must match the categorical features batch size'
         else:
             assert x_high_card_categ is None, 'High-cardinality category values should be None when num_high_card_categories is 0'
 
@@ -234,40 +233,42 @@ class CatTransformer(nn.Module):
 
         return torch.tensor(reduced_embeddings, dtype=torch.float32)
 
-    class MLP(nn.Module):
-        def __init__(self, dims, act=nn.SiLU()) -> None:
-            super().__init__()
-            layers = []
-            for i in range(len(dims) - 1):
-                layers.append(nn.Linear(dims[i], dims[i + 1]))
-                if i < len(dims) - 2:
-                    layers.append(act)
-            self.mlp = nn.Sequential(*layers)
 
-        def forward(self, x) -> torch.Tensor:
-            return self.mlp(x)
+class MLP(nn.Module):
+    def __init__(self, dims, act=nn.SiLU()) -> None:
+        super().__init__()
+        layers = []
+        for i in range(len(dims) - 1):
+            layers.append(nn.Linear(dims[i], dims[i + 1]))
+            if i < len(dims) - 2:
+                layers.append(act)
+        self.mlp = nn.Sequential(*layers)
 
-    class CatTransformerDataset(Dataset):
-        def __init__(self, df, categorical_features, continuous_features, pred_vars,
-                     high_card_features=[]):
-            self.categorical_data = torch.tensor(df[categorical_features].values,
-                                                 dtype=torch.long)
-            self.continuous_data = torch.tensor(df[continuous_features].values,
-                                                dtype=torch.float)
-            self.target_data = torch.tensor(df[pred_vars].values, dtype=torch.float)
-            self.high_card_features = high_card_features
+    def forward(self, x) -> torch.Tensor:
+        return self.mlp(x)
 
-            if high_card_features:
-                self.high_card_data = df[high_card_features].reset_index(drop=True)
 
-        def __len__(self):
-            return len(self.categorical_data)
+class CatTransformerDataset(Dataset):
+    def __init__(self, df, categorical_features, continuous_features, pred_vars,
+                 high_card_features=[]):
+        self.categorical_data = torch.tensor(df[categorical_features].values,
+                                             dtype=torch.long)
+        self.continuous_data = torch.tensor(df[continuous_features].values,
+                                            dtype=torch.float)
+        self.target_data = torch.tensor(df[pred_vars].values, dtype=torch.float)
+        self.high_card_features = high_card_features
 
-        def __getitem__(self, idx):
-            if self.high_card_features:
-                return (self.categorical_data[idx], self.continuous_data[idx],
-                        self.high_card_data.iloc[idx].tolist(), self.target_data[idx])
-            else:
-                return (self.categorical_data[idx], self.continuous_data[idx], None,
-                        self.target_data[idx])
+        if high_card_features:
+            self.high_card_data = df[high_card_features].reset_index(drop=True)
+
+    def __len__(self):
+        return len(self.categorical_data)
+
+    def __getitem__(self, idx):
+        if self.high_card_features:
+            return (self.categorical_data[idx], self.continuous_data[idx],
+                    self.high_card_data.iloc[idx].tolist(), self.target_data[idx])
+        else:
+            return (self.categorical_data[idx], self.continuous_data[idx], None,
+                    self.target_data[idx])
 
