@@ -246,12 +246,9 @@ class MLP(nn.Module):
 
 
 class CatTransformerDataset(Dataset):
-    def __init__(self, df, categorical_features, continuous_features, pred_vars,
-                 high_card_features=[]):
-        self.categorical_data = torch.tensor(df[categorical_features].values,
-                                             dtype=torch.long)
-        self.continuous_data = torch.tensor(df[continuous_features].values,
-                                            dtype=torch.float)
+    def __init__(self, df, categorical_features, continuous_features, pred_vars, high_card_features=[]):
+        self.categorical_data = torch.tensor(df[categorical_features].values, dtype=torch.long)
+        self.continuous_data = torch.tensor(df[continuous_features].values, dtype=torch.float)
         self.target_data = torch.tensor(df[pred_vars].values, dtype=torch.float)
         self.high_card_features = high_card_features
 
@@ -263,9 +260,14 @@ class CatTransformerDataset(Dataset):
 
     def __getitem__(self, idx):
         if self.high_card_features:
-            return (self.categorical_data[idx], self.continuous_data[idx],
-                    self.high_card_data.iloc[idx].tolist(), self.target_data[idx])
-        else:
-            return (self.categorical_data[idx], self.continuous_data[idx], None,
+            return (self.categorical_data[idx],
+                    self.continuous_data[idx],
+                    self.high_card_data.iloc[idx].tolist(),
                     self.target_data[idx])
+        else:
+            return (self.categorical_data[idx],
+                    self.continuous_data[idx],
+                    None,
+                    self.target_data[idx])
+
 
