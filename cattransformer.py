@@ -125,11 +125,10 @@ class CatTransformer(nn.Module):
             self.embeddings_cache = self.load_embeddings_cache()
 
     def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor,
-                x_high_card_categ: pd.DataFrame = None) -> torch.Tensor:
-        device = x_categ.device  # ensure categories_offset is on the same device as x_categ
+                x_high_card_categ: list = None) -> torch.Tensor:
+        device = x_categ.device
         self.categories_offset = self.categories_offset.to(device)
 
-        # sanity check
         assert x_categ.shape[
                    1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
         assert x_cont.shape[
@@ -137,12 +136,11 @@ class CatTransformer(nn.Module):
 
         if self.num_high_card_categories > 0:
             assert x_high_card_categ is not None, 'You must pass in high-cardinality category values'
-            assert x_high_card_categ.shape[
-                       1] == self.num_high_card_categories, f'You must pass in {self.num_high_card_categories} high-cardinality category values'
+            assert len(x_high_card_categ) == x_categ.shape[
+                0], f'The batch size of high-cardinality features must match the categorical features batch size'
         else:
             assert x_high_card_categ is None, 'High-cardinality category values should be None when num_high_card_categories is 0'
 
-        # handle missing data in categorical variables
         x_categ = self.handle_missing_data(x_categ)
 
         if self.num_unique_categories > 0:
@@ -178,7 +176,6 @@ class CatTransformer(nn.Module):
         return logits
 
     def handle_missing_data(self, x_categ: torch.Tensor) -> torch.Tensor:
-        # identify missing data and replace with the index of the special token
         missing_data_mask = (x_categ == 'na') | (x_categ == 'missing') | (
                     x_categ == np.nan) | (x_categ == 'NaN') | (x_categ == 'N/A')
         x_categ[
@@ -200,10 +197,10 @@ class CatTransformer(nn.Module):
         with open(self.embeddings_cache_path, 'wb') as f:
             pickle.dump(self.embeddings_cache, f)
 
-    def get_lm_embeddings(self, x_high_card_categ: pd.DataFrame) -> torch.Tensor:
+    def get_lm_embeddings(self, x_high_card_categ: list) -> torch.Tensor:
         new_texts = []
 
-        for texts in x_high_card_categ.values:
+        for texts in x_high_card_categ:
             for text in texts:
                 if text not in self.embeddings_cache:
                     new_texts.append(text)
@@ -213,12 +210,10 @@ class CatTransformer(nn.Module):
             for text, embedding in zip(new_texts, new_embeddings):
                 self.embeddings_cache[text] = embedding
 
-            # save updated cache
             self.save_embeddings_cache()
 
-        # convert to tensor
         embeddings = [[self.embeddings_cache[text] for text in texts] for texts in
-                      x_high_card_categ.values]
+                      x_high_card_categ]
         embeddings = np.array(embeddings)
         embeddings = torch.tensor(embeddings, dtype=torch.float32)
         return embeddings
@@ -229,49 +224,50 @@ class CatTransformer(nn.Module):
             inputs = self.tokenizer(text, return_tensors='pt', truncation=True,
                                     padding=True, max_length=self.lm_max_length)
             outputs = self.lm_model(**inputs)
-            # fixme: only support [CLS] token embedding for now
             cls_embedding = outputs.last_hidden_state[:, 0, :].detach().numpy()
             embeddings.append(cls_embedding)
 
-        embeddings = np.vstack(embeddings)  # Stack embeddings into a single array
+        embeddings = np.vstack(embeddings)
 
-        # perform PCA to reduce dimensionality
         pca = PCA(n_components=self.dim)
         reduced_embeddings = pca.fit_transform(embeddings)
 
         return torch.tensor(reduced_embeddings, dtype=torch.float32)
 
+    class MLP(nn.Module):
+        def __init__(self, dims, act=nn.SiLU()) -> None:
+            super().__init__()
+            layers = []
+            for i in range(len(dims) - 1):
+                layers.append(nn.Linear(dims[i], dims[i + 1]))
+                if i < len(dims) - 2:
+                    layers.append(act)
+            self.mlp = nn.Sequential(*layers)
 
-class MLP(nn.Module):
-    def __init__(self, dims, act=nn.SiLU()) -> None:
-        super().__init__()
-        layers = []
-        for i in range(len(dims) - 1):
-            layers.append(nn.Linear(dims[i], dims[i + 1]))
-            if i < len(dims) - 2:
-                layers.append(act)
-        self.mlp = nn.Sequential(*layers)
+        def forward(self, x) -> torch.Tensor:
+            return self.mlp(x)
 
-    def forward(self, x) -> torch.Tensor:
-        return self.mlp(x)
+    class CatTransformerDataset(Dataset):
+        def __init__(self, df, categorical_features, continuous_features, pred_vars,
+                     high_card_features=[]):
+            self.categorical_data = torch.tensor(df[categorical_features].values,
+                                                 dtype=torch.long)
+            self.continuous_data = torch.tensor(df[continuous_features].values,
+                                                dtype=torch.float)
+            self.target_data = torch.tensor(df[pred_vars].values, dtype=torch.float)
+            self.high_card_features = high_card_features
 
+            if high_card_features:
+                self.high_card_data = df[high_card_features].reset_index(drop=True)
 
-class CatTransformerDataset(Dataset):
-    def __init__(self, df, categorical_features, continuous_features, pred_vars, high_card_features=[]):
-        self.categorical_data = torch.tensor(df[categorical_features].values, dtype=torch.long)
-        self.continuous_data = torch.tensor(df[continuous_features].values, dtype=torch.float)
-        self.target_data = torch.tensor(df[pred_vars].values, dtype=torch.float)
-        self.high_card_features = high_card_features
+        def __len__(self):
+            return len(self.categorical_data)
 
-        if high_card_features:
-            self.high_card_data = df[high_card_features].reset_index(drop=True)
-
-    def __len__(self):
-        return len(self.categorical_data)
-
-    def __getitem__(self, idx):
-        if self.high_card_features:
-            return (self.categorical_data[idx], self.continuous_data[idx], self.high_card_data.iloc[idx], self.target_data[idx])
-        else:
-            return (self.categorical_data[idx], self.continuous_data[idx], None, self.target_data[idx])
+        def __getitem__(self, idx):
+            if self.high_card_features:
+                return (self.categorical_data[idx], self.continuous_data[idx],
+                        self.high_card_data.iloc[idx].tolist(), self.target_data[idx])
+            else:
+                return (self.categorical_data[idx], self.continuous_data[idx], None,
+                        self.target_data[idx])
 
