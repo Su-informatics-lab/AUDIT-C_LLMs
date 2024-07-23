@@ -58,12 +58,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Train a CatTransformer for AUDIT-C Scoring."
     )
-    parser.add_argument("--with_drug_string", action='store_true', default=False, help="if use drug data; set to False will only use demo + como (as a TabTransformer)")
+    parser.add_argument("--with_drug_string", action='store_true', default=False,
+                        help="if use drug data; set to False will only use demo + como (as a TabTransformer)")
     parser.add_argument("--learning_rate", type=float, default=1e-5)
     parser.add_argument("--num_epochs", type=int, default=200)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--eval_interval", type=int, default=1000)
-    parser.add_argument("--patience", type=int, default=1000, help='early stopping patience')
+    parser.add_argument("--patience", type=int, default=1000,
+                        help='early stopping patience')
     args = parser.parse_args()
 
     # initialize wandb
@@ -80,16 +82,14 @@ if __name__ == "__main__":
     # pipe-separated drug in one column: 15,355 unique concepts; if one uses no drug in the past year, then it is a "NaN"
     # and other columns: scores (q1.score, q2.score, q3.score, audit.c.score), split, and person_id
     DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_DEMO_ExpComo_PipeSep_HalfYearDrug_212K.parquet'
-    df = pd.read_parquet(
-        DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH)
+    df = pd.read_parquet(DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH)
     df = prepare_standard_concept_name(df)
 
     # carefully encode gender, race, and ethnicity
-    df['gender'] = encode_categorical_with_reference(df, 'gender',
-                                                             'Man')
+    df['gender'] = encode_categorical_with_reference(df, 'gender', 'Man')
     df['race'] = encode_categorical_with_reference(df, 'race', 'White')
-    df['ethnicity'] = encode_categorical_with_reference(df, 'ethnicity',
-                                                                'Others')
+    df['ethnicity'] = encode_categorical_with_reference(df, 'ethnicity', 'Others')
+
     # reserve data we used for this run
     categorical_features = [
         "Metastatic_Solid_Tumor",
@@ -123,24 +123,31 @@ if __name__ == "__main__":
         all_cols += ['standard_concept_name']
 
     df_train = df.loc[df["split"] == "train"][all_cols]  # 20,536 individuals * 23 cols
-    df_val = df.loc[df["split"] == "validation"][all_cols]  # 2,000 individuals * 23 cols
+    df_val = df.loc[df["split"] == "validation"][
+        all_cols]  # 2,000 individuals * 23 cols
     df_test = df.loc[df["split"] == "test"][all_cols]  # 5,000 individuals * 23 cols
 
     # convert the train, validation, and test sets to tensors
     x_categ_train = torch.tensor(df_train[categorical_features].values,
-                                 dtype=torch.long)
-    x_cont_train = torch.tensor(df_train[continuous_features].values, dtype=torch.float)
+                                 dtype=torch.long).to(device)
+    x_cont_train = torch.tensor(df_train[continuous_features].values,
+                                dtype=torch.float).to(device)
     y_train = torch.tensor(df_train["audit.c.score"].values,
-                           dtype=torch.float).unsqueeze(1)
+                           dtype=torch.float).unsqueeze(1).to(device)
 
-    x_categ_val = torch.tensor(df_val[categorical_features].values, dtype=torch.long)
-    x_cont_val = torch.tensor(df_val[continuous_features].values, dtype=torch.float)
-    y_val = torch.tensor(df_val["audit.c.score"].values, dtype=torch.float).unsqueeze(1)
+    x_categ_val = torch.tensor(df_val[categorical_features].values,
+                               dtype=torch.long).to(device)
+    x_cont_val = torch.tensor(df_val[continuous_features].values, dtype=torch.float).to(
+        device)
+    y_val = torch.tensor(df_val["audit.c.score"].values, dtype=torch.float).unsqueeze(
+        1).to(device)
 
-    x_categ_test = torch.tensor(df_test[categorical_features].values, dtype=torch.long)
-    x_cont_test = torch.tensor(df_test[continuous_features].values, dtype=torch.float)
+    x_categ_test = torch.tensor(df_test[categorical_features].values,
+                                dtype=torch.long).to(device)
+    x_cont_test = torch.tensor(df_test[continuous_features].values,
+                               dtype=torch.float).to(device)
     y_test = torch.tensor(df_test["audit.c.score"].values, dtype=torch.float).unsqueeze(
-        1)
+        1).to(device)
 
     cont_mean_std = (
         torch.Tensor(
@@ -158,21 +165,28 @@ if __name__ == "__main__":
     assert len(categories) == len(categorical_features)
 
     model = CatTransformer(
-        categories=categories,  # a list containing the number of unique values (i.e., levels) within each easily encodable category (categories of low cardinality)
-        num_high_card_categories=0 if not args.with_drug_string else 1,  # fall back to a TabTransformer if no high_card_categ is in place
+        categories=categories,
+        # a list containing the number of unique values (i.e., levels) within each easily encodable category (categories of low cardinality)
+        num_high_card_categories=0 if not args.with_drug_string else 1,
+        # fall back to a TabTransformer if no high_card_categ is in place
         num_continuous=len(continuous_features),  # number of continuous variables
         dim=32,  # input dimension/embedding size, paper set at 32
         depth=6,  # number of stacking transformer blocks, paper recommended 6
         heads=8,  # number of attention heads, paper recommends 8
         dim_head=16,  # vector length for each attention head
         dim_out=1,  # output dimension, fixed to 1 for regression
-        mlp_hidden_mults=(4, 2),  # defines number of hidden layers of final MLP and multiplier of (bottom to top) input_size of (dim * num_categories) + num_continuous + dim
+        mlp_hidden_mults=(4, 2),
+        # defines number of hidden layers of final MLP and multiplier of (bottom to top) input_size of (dim * num_categories) + num_continuous + dim
         mlp_act=nn.SiLU(),  # activation function for MLP
-        continuous_mean_std=cont_mean_std,  # precomputed mean/std for continuous variables
+        continuous_mean_std=cont_mean_std,
+        # precomputed mean/std for continuous variables
         transformer_dropout=0.1,  # dropout for attention and residual links
-        use_shared_categ_embed=True,  # share a fixed-length embeddings indicating the levels from the same column
-        shared_categ_dim_divisor=8,  # 1/8 of cat_embedding dims are shared in CatCTransformer
-        lm_model_name='UFNLP/gatortron-base', # Hugging Face BERT variant model name, and we recommend `Su-informatics-lab/gatortron_base_rxnorm_babbage_v2`
+        use_shared_categ_embed=True,
+        # share a fixed-length embeddings indicating the levels from the same column
+        shared_categ_dim_divisor=8,
+        # 1/8 of cat_embedding dims are shared in CatCTransformer
+        lm_model_name='UFNLP/gatortron-base',
+        # Hugging Face BERT variant model name, and we recommend `Su-informatics-lab/gatortron_base_rxnorm_babbage_v2`
         lm_max_length=512,  # max tokens for LM embedding computation
         embeddings_cache_path='.lm_embeddings.pkl'  # path to cache embeddings
     ).to(device)
@@ -205,6 +219,10 @@ if __name__ == "__main__":
         total_steps = 0
 
         for step, (x_categ_batch, x_cont_batch, y_batch) in enumerate(train_loader):
+            x_categ_batch = x_categ_batch.to(device)
+            x_cont_batch = x_cont_batch.to(device)
+            y_batch = y_batch.to(device)
+
             optimizer.zero_grad()
             pred_train = model(x_categ_batch, x_cont_batch)
             loss = criterion(pred_train, y_batch)
@@ -230,6 +248,10 @@ if __name__ == "__main__":
                 eval_labels = []
                 with torch.no_grad():
                     for x_categ_batch, x_cont_batch, y_batch in val_loader:
+                        x_categ_batch = x_categ_batch.to(device)
+                        x_cont_batch = x_cont_batch.to(device)
+                        y_batch = y_batch.to(device)
+
                         pred_val = model(x_categ_batch, x_cont_batch)
                         eval_preds.append(pred_val.cpu().numpy())
                         eval_labels.append(y_batch.cpu().numpy())
@@ -269,6 +291,10 @@ if __name__ == "__main__":
 
     with torch.no_grad():
         for x_categ_batch, x_cont_batch, y_batch in test_loader:
+            x_categ_batch = x_categ_batch.to(device)
+            x_cont_batch = x_cont_batch.to(device)
+            y_batch = y_batch.to(device)
+
             pred_test = model(x_categ_batch, x_cont_batch)
             test_preds.append(pred_test.cpu().numpy())
             test_labels.append(y_batch.cpu().numpy())
