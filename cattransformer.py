@@ -197,7 +197,6 @@ class CatTransformer(nn.Module):
         for texts in x_high_card_categ:
             embedding_list = [self.embeddings_cache[text] for text in texts]
             embeddings.append(np.stack(embedding_list, axis=0))
-            print(f'***{embeddings.shape=}***')
         embeddings = np.stack(embeddings, axis=0)
         embeddings = torch.tensor(embeddings, dtype=torch.float32).to(device)
         print(f'***output: {embeddings.shape=}***')
