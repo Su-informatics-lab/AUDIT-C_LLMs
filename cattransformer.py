@@ -121,20 +121,16 @@ class CatTransformer(nn.Module):
             self.embeddings_cache_path = embeddings_cache_path
             self.embeddings_cache = self.load_embeddings_cache()
 
-    def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor,
-                x_high_card_categ: list = None) -> torch.Tensor:
+    def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor, x_high_card_categ: list = None) -> torch.Tensor:
         device = x_categ.device
         self.categories_offset = self.categories_offset.to(device)
 
-        assert x_categ.shape[
-                   1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
-        assert x_cont.shape[
-                   1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
+        assert x_categ.shape[1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
+        assert x_cont.shape[1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
 
         if self.num_high_card_categories > 0:
             assert x_high_card_categ is not None, 'You must pass in high-cardinality category values'
-            assert len(x_high_card_categ) == x_categ.shape[
-                0], 'The batch size of high-cardinality features must match the categorical features batch size'
+            assert len(x_high_card_categ) == x_categ.shape[0], 'The batch size of high-cardinality features must match the categorical features batch size'
         else:
             assert x_high_card_categ is None, 'High-cardinality category values should be None when num_high_card_categories is 0'
 
@@ -145,8 +141,7 @@ class CatTransformer(nn.Module):
             categ_embed = self.category_embed(x_categ)
 
             if self.use_shared_categ_embed:
-                shared_categ_embed = self.shared_category_embed.unsqueeze(0).repeat(
-                    categ_embed.shape[0], 1, 1)
+                shared_categ_embed = self.shared_category_embed.unsqueeze(0).repeat(categ_embed.shape[0], 1, 1)
                 shared_categ_embed = shared_categ_embed.to(device)
                 categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
 
