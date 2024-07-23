@@ -215,7 +215,7 @@ class CatTransformer(nn.Module):
         pca = PCA(n_components=self.dim)
         reduced_embeddings = pca.fit_transform(embeddings)
 
-        return torch.tensor(reduced_embeddings, dtype=torch.float32).to(device)
+        return torch.tensor(reduced_embeddings, dtype=torch.float32)
 
 
 class MLP(nn.Module):
