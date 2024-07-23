@@ -179,8 +179,7 @@ class CatTransformer(nn.Module):
         with open(self.embeddings_cache_path, 'wb') as f:
             pickle.dump(self.embeddings_cache, f)
 
-    def get_lm_embeddings(self, x_high_card_categ: list,
-                          device: torch.device) -> torch.Tensor:
+    def get_lm_embeddings(self, x_high_card_categ: list, device: torch.device) -> torch.Tensor:
         new_texts = []
 
         for texts in x_high_card_categ:
@@ -195,8 +194,7 @@ class CatTransformer(nn.Module):
 
             self.save_embeddings_cache()
 
-        embeddings = [[self.embeddings_cache[text].cpu() for text in texts] for texts in
-                      x_high_card_categ]
+        embeddings = [[self.embeddings_cache[text].cpu() for text in texts] for texts in x_high_card_categ]
         embeddings = np.array(embeddings)
         embeddings = torch.tensor(embeddings, dtype=torch.float32).to(device)
         return embeddings
@@ -204,9 +202,7 @@ class CatTransformer(nn.Module):
     def compute_embeddings(self, texts: list, device: torch.device) -> torch.Tensor:
         embeddings = []
         for text in tqdm(texts, desc="Computing LM embeddings"):
-            inputs = self.tokenizer(text, return_tensors='pt', truncation=True,
-                                    padding=True, max_length=self.lm_max_length).to(
-                device)
+            inputs = self.tokenizer(text, return_tensors='pt', truncation=True, padding=True, max_length=self.lm_max_length).to(device)
             outputs = self.lm_model(**inputs)
             cls_embedding = outputs.last_hidden_state[:, 0, :].detach().cpu().numpy()
             embeddings.append(cls_embedding)
@@ -215,7 +211,7 @@ class CatTransformer(nn.Module):
         pca = PCA(n_components=self.dim)
         reduced_embeddings = pca.fit_transform(embeddings)
 
-        return torch.tensor(reduced_embeddings, dtype=torch.float32).to(device)
+        return torch.tensor(reduced_embeddings, dtype=torch.float32)
 
 
 class MLP(nn.Module):
