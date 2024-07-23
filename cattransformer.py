@@ -94,13 +94,8 @@ class CatTransformer(nn.Module):
         if self.num_continuous > 0:
             if continuous_mean_std is not None:
                 assert continuous_mean_std.shape == (num_continuous, 2), (
-                    f'continuous_mean_std must '
-                    f'have a shape'
-                    f' of ({num_continuous}, '
-                    f'2) where the last '
-                    f'dimension contains the '
-                    f'mean and variance '
-                    f'respectively')
+                    f'continuous_mean_std must have a shape of ({num_continuous}, 2) where the last '
+                    f'dimension contains the mean and variance respectively')
             self.register_buffer('continuous_mean_std', continuous_mean_std)
             self.cont_norm = nn.LayerNorm(num_continuous)
 
@@ -121,20 +116,20 @@ class CatTransformer(nn.Module):
             self.embeddings_cache_path = embeddings_cache_path
             self.embeddings_cache = self.load_embeddings_cache()
 
-    def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor, x_high_card_categ: list = None) -> torch.Tensor:
+    def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor,
+                x_high_card_categ: list = None) -> torch.Tensor:
         device = x_categ.device
         self.categories_offset = self.categories_offset.to(device)
 
-        assert x_categ.shape[1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
-        assert x_cont.shape[1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
+        assert x_categ.shape[
+                   1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
+        assert x_cont.shape[
+                   1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
 
         if self.num_high_card_categories > 0:
             assert x_high_card_categ is not None, 'You must pass in high-cardinality category values'
-            # print(f"{x_high_card_categ=}")
-            # print(f"{len(x_high_card_categ)=}")
-            # print(f"{x_categ=}")
-            # print(f"{x_categ.shape=}")
-            assert len(x_high_card_categ[0]) == x_categ.shape[0], 'The batch size of high-cardinality features must match the categorical features batch size'
+            assert len(x_high_card_categ) == x_categ.shape[
+                0], 'The batch size of high-cardinality features must match the categorical features batch size'
         else:
             assert x_high_card_categ is None, 'High-cardinality category values should be None when num_high_card_categories is 0'
 
@@ -151,8 +146,7 @@ class CatTransformer(nn.Module):
                 categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
 
         if self.use_lm_embeddings and self.num_high_card_categories > 0:
-            lm_cat_proj = self.get_lm_embeddings(x_high_card_categ)
-            lm_cat_proj = lm_cat_proj.to(device)
+            lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
             categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
 
         x = self.transformer(categ_embed)
@@ -193,7 +187,8 @@ class CatTransformer(nn.Module):
         with open(self.embeddings_cache_path, 'wb') as f:
             pickle.dump(self.embeddings_cache, f)
 
-    def get_lm_embeddings(self, x_high_card_categ: list) -> torch.Tensor:
+    def get_lm_embeddings(self, x_high_card_categ: list,
+                          device: torch.device) -> torch.Tensor:
         new_texts = []
 
         for texts in x_high_card_categ:
@@ -202,7 +197,7 @@ class CatTransformer(nn.Module):
                     new_texts.append(text)
 
         if new_texts:
-            new_embeddings = self.compute_embeddings(new_texts)
+            new_embeddings = self.compute_embeddings(new_texts, device)
             for text, embedding in zip(new_texts, new_embeddings):
                 self.embeddings_cache[text] = embedding
 
@@ -211,64 +206,63 @@ class CatTransformer(nn.Module):
         embeddings = [[self.embeddings_cache[text] for text in texts] for texts in
                       x_high_card_categ]
         embeddings = np.array(embeddings)
-        embeddings = torch.tensor(embeddings, dtype=torch.float32)
+        embeddings = torch.tensor(embeddings, dtype=torch.float32).to(device)
         return embeddings
 
-    def compute_embeddings(self, texts: list) -> torch.Tensor:
+    def compute_embeddings(self, texts: list, device: torch.device) -> torch.Tensor:
         embeddings = []
         for text in tqdm(texts, desc="Computing LM embeddings"):
             inputs = self.tokenizer(text, return_tensors='pt', truncation=True,
-                                    padding=True, max_length=self.lm_max_length)
+                                    padding=True, max_length=self.lm_max_length).to(
+                device)
             outputs = self.lm_model(**inputs)
-            cls_embedding = outputs.last_hidden_state[:, 0, :].detach().numpy()
+            cls_embedding = outputs.last_hidden_state[:, 0, :].detach().cpu().numpy()
             embeddings.append(cls_embedding)
 
         embeddings = np.vstack(embeddings)
-
         pca = PCA(n_components=self.dim)
         reduced_embeddings = pca.fit_transform(embeddings)
 
-        return torch.tensor(reduced_embeddings, dtype=torch.float32)
+        return torch.tensor(reduced_embeddings, dtype=torch.float32).to(device)
 
+    class MLP(nn.Module):
+        def __init__(self, dims, act=nn.SiLU()) -> None:
+            super().__init__()
+            layers = []
+            for i in range(len(dims) - 1):
+                layers.append(nn.Linear(dims[i], dims[i + 1]))
+                if i < len(dims) - 2:
+                    layers.append(act)
+            self.mlp = nn.Sequential(*layers)
 
-class MLP(nn.Module):
-    def __init__(self, dims, act=nn.SiLU()) -> None:
-        super().__init__()
-        layers = []
-        for i in range(len(dims) - 1):
-            layers.append(nn.Linear(dims[i], dims[i + 1]))
-            if i < len(dims) - 2:
-                layers.append(act)
-        self.mlp = nn.Sequential(*layers)
+        def forward(self, x) -> torch.Tensor:
+            return self.mlp(x)
 
-    def forward(self, x) -> torch.Tensor:
-        return self.mlp(x)
+    class CatTransformerDataset(Dataset):
+        def __init__(self, df, categorical_features, continuous_features, pred_vars,
+                     high_card_features=[]):
+            self.categorical_data = torch.tensor(df[categorical_features].values,
+                                                 dtype=torch.long)
+            self.continuous_data = torch.tensor(df[continuous_features].values,
+                                                dtype=torch.float)
+            self.target_data = torch.tensor(df[pred_vars].values, dtype=torch.float)
+            self.high_card_features = high_card_features
 
+            if high_card_features:
+                self.high_card_data = df[high_card_features].reset_index(drop=True)
 
-class CatTransformerDataset(Dataset):
-    def __init__(self, df, categorical_features, continuous_features, pred_vars, high_card_features=[]):
-        self.categorical_data = torch.tensor(df[categorical_features].values, dtype=torch.long)
-        self.continuous_data = torch.tensor(df[continuous_features].values, dtype=torch.float)
-        self.target_data = torch.tensor(df[pred_vars].values, dtype=torch.float)
-        self.high_card_features = high_card_features
+        def __len__(self):
+            return len(self.categorical_data)
 
-        if high_card_features:
-            self.high_card_data = df[high_card_features].reset_index(drop=True)
-
-    def __len__(self):
-        return len(self.categorical_data)
-
-    def __getitem__(self, idx):
-        if self.high_card_features:
-            high_card_sample = self.high_card_data.iloc[idx].tolist()
-            return (self.categorical_data[idx],
-                    self.continuous_data[idx],
-                    high_card_sample,
-                    self.target_data[idx])
-        else:
-            return (self.categorical_data[idx],
-                    self.continuous_data[idx],
-                    None,
-                    self.target_data[idx])
-
-
+        def __getitem__(self, idx):
+            if self.high_card_features:
+                high_card_sample = self.high_card_data.iloc[idx].tolist()
+                return (self.categorical_data[idx],
+                        self.continuous_data[idx],
+                        high_card_sample,
+                        self.target_data[idx])
+            else:
+                return (self.categorical_data[idx],
+                        self.continuous_data[idx],
+                        None,
+                        self.target_data[idx])
