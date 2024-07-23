@@ -179,8 +179,8 @@ class CatTransformer(nn.Module):
     def get_lm_embeddings(self, x_high_card_categ: list,
                           device: torch.device) -> torch.Tensor:
         new_texts = []
-        print(f'***{len(x_high_card_categ)=}***')
-        print(f'***{len(x_high_card_categ[0])=}***')
+        # print(f'***{len(x_high_card_categ)=}***')
+        # print(f'***{len(x_high_card_categ[0])=}***')
         for texts in x_high_card_categ:
             for text in texts:
                 if text not in self.embeddings_cache:
@@ -199,33 +199,8 @@ class CatTransformer(nn.Module):
             embeddings.append(np.stack(embedding_list, axis=0))
         embeddings = np.stack(embeddings, axis=0)
         embeddings = torch.tensor(embeddings, dtype=torch.float32).to(device)
-        print(f'***output: {embeddings.shape=}***')
+        # print(f'***output: {embeddings.shape=}***')
         return embeddings
-
-    # def get_lm_embeddings(self, x_high_card_categ: list,
-    #                       device: torch.device) -> torch.Tensor:
-    #     new_texts = []
-    #     print(f'***{len(x_high_card_categ)=}***')
-    #     print(f'***{len(x_high_card_categ[0])=}***')
-    #     for texts in x_high_card_categ:
-    #         for text in texts:
-    #             if text not in self.embeddings_cache:
-    #                 new_texts.append(text)
-    #
-    #     if new_texts:
-    #         new_embeddings = self.compute_embeddings(new_texts, device)
-    #         for text, embedding in zip(new_texts, new_embeddings):
-    #             self.embeddings_cache[text] = embedding
-    #
-    #         self.save_embeddings_cache()
-    #
-    #     embeddings = [[self.embeddings_cache[text].cpu() for text in texts] for texts in
-    #                   x_high_card_categ]
-    #     embeddings = np.array(embeddings)
-    #     print(f'***{embeddings.shape=}***')
-    #     embeddings = torch.tensor(embeddings, dtype=torch.float32).to(device)
-    #     print(f'***{embeddings.shape=}***')
-    #     return embeddings
 
     def compute_embeddings(self, texts: list, device: torch.device) -> torch.Tensor:
         embeddings = []
