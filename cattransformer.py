@@ -15,8 +15,10 @@ __license__ = "0BSD"
 
 import os
 import pickle
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -215,50 +217,40 @@ class CatTransformer(nn.Module):
 
         return torch.tensor(reduced_embeddings, dtype=torch.float32).to(device)
 
-    class MLP(nn.Module):
-        def __init__(self, dims, act=nn.SiLU()) -> None:
-            super().__init__()
-            layers = []
-            for i in range(len(dims) - 1):
-                layers.append(nn.Linear(dims[i], dims[i + 1]))
-                if i < len(dims) - 2:
-                    layers.append(act)
-            self.mlp = nn.Sequential(*layers)
+class MLP(nn.Module):
+    def __init__(self, dims, act=nn.SiLU()) -> None:
+        super().__init__()
+        layers = []
+        for i in range(len(dims) - 1):
+            layers.append(nn.Linear(dims[i], dims[i + 1]))
+            if i < len(dims) - 2:
+                layers.append(act)
+        self.mlp = nn.Sequential(*layers)
 
-        def forward(self, x) -> torch.Tensor:
-            return self.mlp(x)
+    def forward(self, x) -> torch.Tensor:
+        return self.mlp(x)
 
-    class CatTransformerDataset(Dataset):
-        def __init__(self, df, categorical_features, continuous_features, pred_vars,
-                     high_card_features=[]):
-            self.categorical_data = torch.tensor(df[categorical_features].values,
-                                                 dtype=torch.long)
-            self.continuous_data = torch.tensor(df[continuous_features].values,
-                                                dtype=torch.float)
-            self.target_data = torch.tensor(df[pred_vars].values, dtype=torch.float)
-            self.high_card_features = high_card_features
-
-            if high_card_features:
-                self.high_card_data = df[high_card_features].reset_index(drop=True)
-
-        def __len__(self):
-            return len(self.categorical_data)
-
-        def __getitem__(self, idx):
-            if self.high_card_features:
-                high_card_sample = self.high_card_data.iloc[idx].tolist()
-                return (self.categorical_data[idx],
-                        self.continuous_data[idx],
-                        high_card_sample,
-                        self.target_data[idx])
-            else:
-                return (self.categorical_data[idx],
-                        self.continuous_data[idx],
-                        None,
-                        self.target_data[idx])
 
 class CatTransformerDataset(Dataset):
-    def __init__(self, df, categorical_features, continuous_features, pred_vars, high_card_features=[]):
+    def __init__(self,
+                 df: pd.DataFrame,
+                 categorical_features: List[str],
+                 continuous_features: List[str],
+                 pred_vars: List[str],
+                 high_card_features: Optional[List[str]] = []) -> None:
+        """
+        Initializes the CatTransformerDataset.
+
+        Args:
+            df: The input DataFrame containing all the data.
+            categorical_features: List of column names for categorical features.
+            continuous_features: List of column names for continuous features.
+            pred_vars: List of column names for prediction target variables.
+            high_card_features: List of column names for high cardinality features.
+
+        Returns:
+            None
+        """
         self.categorical_data = torch.tensor(df[categorical_features].values, dtype=torch.long)
         self.continuous_data = torch.tensor(df[continuous_features].values, dtype=torch.float)
         self.target_data = torch.tensor(df[pred_vars].values, dtype=torch.float)
@@ -267,10 +259,22 @@ class CatTransformerDataset(Dataset):
         if high_card_features:
             self.high_card_data = df[high_card_features].reset_index(drop=True)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.categorical_data)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, Optional[List[str]], torch.Tensor]:
+        """
+        Retrieves a single sample from the dataset.
+
+        Args:
+            idx: The index of the sample to retrieve.
+        Returns:
+            A tuple of:
+                - Categorical data tensor
+                - Continuous data tensor
+                - List of high cardinality feature values (if present)
+                - Target data tensor
+        """
         if self.high_card_features:
             high_card_sample = self.high_card_data.iloc[idx].tolist()
             return (self.categorical_data[idx],
