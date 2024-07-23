@@ -230,7 +230,7 @@ if __name__ == "__main__":
                         print(f"Early stopping at epoch {epoch + 1}")
                         break
 
-    # Test the best model
+    # test the best model
     best_model_path = top_models[0][1]
     model.load_state_dict(torch.load(best_model_path))
 
@@ -258,5 +258,3 @@ if __name__ == "__main__":
     wandb.log(
         {"test_loss": test_loss, **{f"test/{k}": v for k, v in test_metrics.items()}}
     )
-
-
