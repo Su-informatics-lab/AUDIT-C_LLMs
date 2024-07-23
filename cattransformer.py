@@ -139,6 +139,7 @@ class CatTransformer(nn.Module):
 
         if self.use_lm_embeddings and self.num_high_card_categories > 0:
             lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
+            print(f'***{lm_cat_proj.shape}***')
             categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
 
         x = self.transformer(categ_embed)
