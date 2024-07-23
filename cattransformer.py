@@ -23,6 +23,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from sklearn.decomposition import PCA
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from torch.utils.data import Dataset
 from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer
 
@@ -133,10 +134,13 @@ class CatTransformer(nn.Module):
                    1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
         assert x_cont.shape[
                    1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
+
         if self.num_high_card_categories > 0:
             assert x_high_card_categ is not None, 'You must pass in high-cardinality category values'
             assert x_high_card_categ.shape[
                        1] == self.num_high_card_categories, f'You must pass in {self.num_high_card_categories} high-cardinality category values'
+        else:
+            assert x_high_card_categ is None, 'High-cardinality category values should be None when num_high_card_categories is 0'
 
         # handle missing data in categorical variables
         x_categ = self.handle_missing_data(x_categ)
@@ -146,7 +150,8 @@ class CatTransformer(nn.Module):
             categ_embed = self.category_embed(x_categ)
 
             if self.use_shared_categ_embed:
-                shared_categ_embed = self.shared_category_embed.unsqueeze(0).repeat(categ_embed.shape[0], 1, 1)
+                shared_categ_embed = self.shared_category_embed.unsqueeze(0).repeat(
+                    categ_embed.shape[0], 1, 1)
                 shared_categ_embed = shared_categ_embed.to(device)
                 categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
 
@@ -249,3 +254,24 @@ class MLP(nn.Module):
 
     def forward(self, x) -> torch.Tensor:
         return self.mlp(x)
+
+
+class CatTransformerDataset(Dataset):
+    def __init__(self, df, categorical_features, continuous_features, pred_vars, high_card_features=[]):
+        self.categorical_data = torch.tensor(df[categorical_features].values, dtype=torch.long)
+        self.continuous_data = torch.tensor(df[continuous_features].values, dtype=torch.float)
+        self.target_data = torch.tensor(df[pred_vars].values, dtype=torch.float)
+        self.high_card_features = high_card_features
+
+        if high_card_features:
+            self.high_card_data = df[high_card_features].reset_index(drop=True)
+
+    def __len__(self):
+        return len(self.categorical_data)
+
+    def __getitem__(self, idx):
+        if self.high_card_features:
+            return (self.categorical_data[idx], self.continuous_data[idx], self.high_card_data.iloc[idx], self.target_data[idx])
+        else:
+            return (self.categorical_data[idx], self.continuous_data[idx], None, self.target_data[idx])
+
