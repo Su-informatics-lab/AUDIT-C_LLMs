@@ -14,7 +14,6 @@ from torch.utils.data import DataLoader, RandomSampler
 from cattransformer import CatTransformer, CatTransformerDataset
 from utils import PROJECT_NAME, SEED, compute_metrics
 
-# for reproducibility
 torch.manual_seed(SEED)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -29,18 +28,11 @@ def save_model(model, eval_loss, top_models, run_name):
     top_models = sorted(top_models, key=lambda x: x[0])[:3]  # keep only top 3 models
     return top_models
 
-def prepare_standard_concept_name(df,
-                                  prefix="Drugs used in the past half year may or may not reflect one's drinking behavior: "):
+def prepare_standard_concept_name(df, prefix="Drugs used in the past half year may or may not reflect one's drinking behavior: "):
     column_name = 'standard_concept_name'
-    # replace " | " with ", "
     df[column_name] = df[column_name].str.replace(" | ", ", ", regex=False)
-
-    # substitute NaN values
     df[column_name] = df[column_name].fillna("No drug used in the past half year.")
-
-    # optionally prepend the column values with a specified prefix
     df[column_name] = prefix + df[column_name]
-
     return df
 
 def encode_categorical_with_reference(df, column, reference):
@@ -62,14 +54,12 @@ if __name__ == "__main__":
                         help='early stopping patience')
     args = parser.parse_args()
 
-    # initialize wandb
     run_name = "CatTransformer_demoComo_drug" if args.with_drug_string else "CatTransformer_demoComo"
     try:
         wandb.init(project=PROJECT_NAME, name=run_name)
     except wandb.errors.CommError:
         print("WandB communication error, proceeding without logging.")
 
-    ### prepare data
     DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_DEMO_ExpComo_PipeSep_HalfYearDrug_212K.parquet'
     df = pd.read_parquet(DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH)
     df = prepare_standard_concept_name(df)
@@ -103,8 +93,6 @@ if __name__ == "__main__":
     ]
 
     continuous_features = ["age"]
-    # we can do this
-    # pred_vars = ["q1.score", "q2.score", "q3.score"]
     pred_vars = ["audit.c.score"]
     all_cols = categorical_features + continuous_features + pred_vars
 
@@ -179,6 +167,9 @@ if __name__ == "__main__":
             x_cont_batch = x_cont_batch.to(device)
             y_batch = y_batch.to(device)
 
+            if args.with_drug_string:
+                x_high_card_batch = [texts for texts in x_high_card_batch]
+
             optimizer.zero_grad()
             pred_train = model(x_categ_batch, x_cont_batch, x_high_card_batch)
             loss = criterion(pred_train, y_batch)
@@ -206,6 +197,9 @@ if __name__ == "__main__":
                         x_categ_batch = x_categ_batch.to(device)
                         x_cont_batch = x_cont_batch.to(device)
                         y_batch = y_batch.to(device)
+
+                        if args.with_drug_string:
+                            x_high_card_batch = [texts for texts in x_high_card_batch]
 
                         pred_val = model(x_categ_batch, x_cont_batch, x_high_card_batch)
                         eval_preds.append(pred_val.cpu().numpy())
@@ -247,6 +241,9 @@ if __name__ == "__main__":
             x_categ_batch = x_categ_batch.to(device)
             x_cont_batch = x_cont_batch.to(device)
             y_batch = y_batch.to(device)
+
+            if args.with_drug_string:
+                x_high_card_batch = [texts for texts in x_high_card_batch]
 
             pred_test = model(x_categ_batch, x_cont_batch, x_high_card_batch)
             test_preds.append(pred_test.cpu().numpy())
