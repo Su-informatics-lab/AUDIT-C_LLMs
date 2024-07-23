@@ -19,6 +19,7 @@ torch.manual_seed(SEED)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
+
 def save_model(model, eval_loss, top_models, run_name):
     model_dir = f"ckpts/{run_name}"
     os.makedirs(model_dir, exist_ok=True)
@@ -28,6 +29,7 @@ def save_model(model, eval_loss, top_models, run_name):
     top_models = sorted(top_models, key=lambda x: x[0])[:3]  # keep only top 3 models
     return top_models
 
+
 def prepare_standard_concept_name(df, prefix="Drugs used in the past half year may or may not reflect one's drinking behavior: "):
     column_name = 'standard_concept_name'
     df[column_name] = df[column_name].str.replace(" | ", ", ", regex=False)
@@ -35,9 +37,11 @@ def prepare_standard_concept_name(df, prefix="Drugs used in the past half year m
     df[column_name] = prefix + df[column_name]
     return df
 
+
 def encode_categorical_with_reference(df, column, reference):
     categories = [reference] + [x for x in df[column].unique() if x != reference]
     return pd.Categorical(df[column], categories=categories).codes
+
 
 if __name__ == "__main__":
     torch.manual_seed(SEED)
@@ -148,6 +152,7 @@ if __name__ == "__main__":
         embeddings_cache_path='.lm_embeddings.pkl'  # path to cache embeddings
     ).to(device)
 
+    # training settings
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
     num_epochs = args.num_epochs
@@ -162,13 +167,12 @@ if __name__ == "__main__":
         running_loss = 0.0
         total_steps = 0
 
-        for step, (x_categ_batch, x_cont_batch, x_high_card_batch, y_batch) in enumerate(train_loader):
+        for step, (
+        x_categ_batch, x_cont_batch, x_high_card_batch, y_batch) in enumerate(
+                train_loader):
             x_categ_batch = x_categ_batch.to(device)
             x_cont_batch = x_cont_batch.to(device)
             y_batch = y_batch.to(device)
-
-            if args.with_drug_string:
-                x_high_card_batch = [texts for texts in x_high_card_batch]
 
             optimizer.zero_grad()
             pred_train = model(x_categ_batch, x_cont_batch, x_high_card_batch)
@@ -198,9 +202,6 @@ if __name__ == "__main__":
                         x_cont_batch = x_cont_batch.to(device)
                         y_batch = y_batch.to(device)
 
-                        if args.with_drug_string:
-                            x_high_card_batch = [texts for texts in x_high_card_batch]
-
                         pred_val = model(x_categ_batch, x_cont_batch, x_high_card_batch)
                         eval_preds.append(pred_val.cpu().numpy())
                         eval_labels.append(y_batch.cpu().numpy())
@@ -229,6 +230,7 @@ if __name__ == "__main__":
                         print(f"Early stopping at epoch {epoch + 1}")
                         break
 
+    # Test the best model
     best_model_path = top_models[0][1]
     model.load_state_dict(torch.load(best_model_path))
 
@@ -241,9 +243,6 @@ if __name__ == "__main__":
             x_categ_batch = x_categ_batch.to(device)
             x_cont_batch = x_cont_batch.to(device)
             y_batch = y_batch.to(device)
-
-            if args.with_drug_string:
-                x_high_card_batch = [texts for texts in x_high_card_batch]
 
             pred_test = model(x_categ_batch, x_cont_batch, x_high_card_batch)
             test_preds.append(pred_test.cpu().numpy())
@@ -259,4 +258,5 @@ if __name__ == "__main__":
     wandb.log(
         {"test_loss": test_loss, **{f"test/{k}": v for k, v in test_metrics.items()}}
     )
+
 

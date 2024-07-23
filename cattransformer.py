@@ -256,7 +256,7 @@ class CatTransformerDataset(Dataset):
 
     def __getitem__(self, idx):
         if self.high_card_features:
-            high_card_sample = self.high_card_data.iloc[idx].values.flatten().tolist()
+            high_card_sample = self.high_card_data.iloc[idx].tolist()
             return (self.categorical_data[idx],
                     self.continuous_data[idx],
                     high_card_sample,
