@@ -72,7 +72,7 @@ class CatTransformer(nn.Module):
         self.dim = dim
         self.lm_max_length = lm_max_length
 
-        total_tokens = self.num_unique_categories + 1  # for the missing value token
+        total_tokens = self.num_unique_categories + 1
         shared_embed_dim = 0 if not use_shared_categ_embed else int(
             dim // shared_categ_dim_divisor)
 
@@ -85,8 +85,7 @@ class CatTransformer(nn.Module):
             nn.init.normal_(self.shared_category_embed, std=0.02)
 
         if self.num_unique_categories > 0:
-            categories_offset = F.pad(torch.tensor(list(categories)), (1, 0),
-                                      value=1)  # offset by 1 for the missing token
+            categories_offset = F.pad(torch.tensor(list(categories)), (1, 0), value=1)
             categories_offset = categories_offset.cumsum(dim=-1)[:-1]
             self.register_buffer('categories_offset', categories_offset)
 
@@ -110,7 +109,6 @@ class CatTransformer(nn.Module):
                                                  dropout=transformer_dropout)
         self.transformer = TransformerEncoder(encoder_layers, num_layers=depth)
 
-        # calculate input size
         transformer_input_size = dim * (self.num_categories + num_high_card_categories)
         input_size = transformer_input_size + num_continuous
         hidden_dimensions = [input_size * t for t in mlp_hidden_mults]
@@ -176,9 +174,8 @@ class CatTransformer(nn.Module):
 
     def handle_missing_data(self, x_categ: torch.Tensor) -> torch.Tensor:
         missing_data_mask = (x_categ == 'na') | (x_categ == 'missing') | (
-                    x_categ == np.nan) | (x_categ == 'NaN') | (x_categ == 'N/A')
-        x_categ[
-            missing_data_mask] = 0  # 0 is the index of the special token for missing data
+                x_categ == np.nan) | (x_categ == 'NaN') | (x_categ == 'N/A')
+        x_categ[missing_data_mask] = 0
         return x_categ
 
     def load_lm_model(self, lm_model_name) -> tuple:
