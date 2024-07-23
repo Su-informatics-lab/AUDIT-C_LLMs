@@ -200,7 +200,9 @@ class CatTransformer(nn.Module):
         embeddings = [[self.embeddings_cache[text].cpu() for text in texts] for texts in
                       x_high_card_categ]
         embeddings = np.array(embeddings)
+        print(f'***{embeddings.shape=}***')
         embeddings = torch.tensor(embeddings, dtype=torch.float32).to(device)
+        print(f'***{embeddings.shape=}***')
         return embeddings
 
     def compute_embeddings(self, texts: list, device: torch.device) -> torch.Tensor:
