@@ -9,7 +9,7 @@ import wandb
 from lifelines.utils import concordance_index
 from sklearn.metrics import mean_squared_error
 from torch import optim
-from torch.utils.data import DataLoader, RandomSampler, TensorDataset
+from torch.utils.data import DataLoader, RandomSampler
 
 from cattransformer import CatTransformer, CatTransformerDataset
 from utils import PROJECT_NAME, SEED, compute_metrics
@@ -29,7 +29,6 @@ def save_model(model, eval_loss, top_models, run_name):
     top_models = sorted(top_models, key=lambda x: x[0])[:3]  # keep only top 3 models
     return top_models
 
-
 def prepare_standard_concept_name(df,
                                   prefix="Drugs used in the past half year may or may not reflect one's drinking behavior: "):
     column_name = 'standard_concept_name'
@@ -44,13 +43,9 @@ def prepare_standard_concept_name(df,
 
     return df
 
-
-# encode three categorical fields: gender, ethnicity, and race
 def encode_categorical_with_reference(df, column, reference):
-    # referenece: man/white/non-hispanic
     categories = [reference] + [x for x in df[column].unique() if x != reference]
     return pd.Categorical(df[column], categories=categories).codes
-
 
 if __name__ == "__main__":
     torch.manual_seed(SEED)
@@ -75,21 +70,14 @@ if __name__ == "__main__":
         print("WandB communication error, proceeding without logging.")
 
     ### prepare data
-    # we got raw (i.e., unencoded) data here: 212k patients with:
-    # demo: 4 columns, gender, race, age, ethnicity
-    # expanded como: 18 columns
-    # pipe-separated drug in one column: 15,355 unique concepts; if one uses no drug in the past year, then it is a "NaN"
-    # and other columns: scores (q1.score, q2.score, q3.score, audit.c.score), split, and person_id
     DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_DEMO_ExpComo_PipeSep_HalfYearDrug_212K.parquet'
     df = pd.read_parquet(DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH)
     df = prepare_standard_concept_name(df)
 
-    # carefully encode gender, race, and ethnicity
     df['gender'] = encode_categorical_with_reference(df, 'gender', 'Man')
     df['race'] = encode_categorical_with_reference(df, 'race', 'White')
     df['ethnicity'] = encode_categorical_with_reference(df, 'ethnicity', 'Others')
 
-    # reserve data we used for this run
     categorical_features = [
         "Metastatic_Solid_Tumor",
         "Dementia",
@@ -126,10 +114,9 @@ if __name__ == "__main__":
     else:
         high_card_features = []
 
-    df_train = df.loc[df["split"] == "train"][all_cols]  # 20,536 individuals * 23 cols
-    df_val = df.loc[df["split"] == "validation"][
-        all_cols]  # 2,000 individuals * 23 cols
-    df_test = df.loc[df["split"] == "test"][all_cols]  # 5,000 individuals * 23 cols
+    df_train = df.loc[df["split"] == "train"][all_cols]
+    df_val = df.loc[df["split"] == "validation"][all_cols]
+    df_test = df.loc[df["split"] == "test"][all_cols]
 
     cont_mean_std = (
         torch.Tensor(
@@ -142,7 +129,6 @@ if __name__ == "__main__":
         .to(device)
     )
 
-    # find out unique values in each column for categorical values
     categories = [len(df_train[c].unique()) for c in categorical_features]
     assert len(categories) == len(categorical_features)
 
@@ -174,18 +160,15 @@ if __name__ == "__main__":
         embeddings_cache_path='.lm_embeddings.pkl'  # path to cache embeddings
     ).to(device)
 
-    # training settings
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
     num_epochs = args.num_epochs
 
-    # early stopping and model saving settings
     early_stopping_steps = args.patience
     early_stopping_counter = 0
     best_eval_loss = float("inf")
     top_models = []
 
-    ### train and eval
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
@@ -195,6 +178,9 @@ if __name__ == "__main__":
             x_categ_batch = x_categ_batch.to(device)
             x_cont_batch = x_cont_batch.to(device)
             y_batch = y_batch.to(device)
+
+            if args.with_drug_string:
+                x_high_card_batch = [texts for texts in x_high_card_batch]
 
             optimizer.zero_grad()
             pred_train = model(x_categ_batch, x_cont_batch, x_high_card_batch)
@@ -213,9 +199,8 @@ if __name__ == "__main__":
                 print(
                     f"Epoch [{epoch + 1}/{num_epochs}], Step [{total_steps}], Average Loss: {avg_loss:.4f}, C-Index: {c_index:.4f}"
                 )
-                running_loss = 0.0  # reset running loss after printing
+                running_loss = 0.0
 
-                # evaluate on validation set
                 model.eval()
                 eval_preds = []
                 eval_labels = []
@@ -224,6 +209,9 @@ if __name__ == "__main__":
                         x_categ_batch = x_categ_batch.to(device)
                         x_cont_batch = x_cont_batch.to(device)
                         y_batch = y_batch.to(device)
+
+                        if args.with_drug_string:
+                            x_high_card_batch = [texts for texts in x_high_card_batch]
 
                         pred_val = model(x_categ_batch, x_cont_batch, x_high_card_batch)
                         eval_preds.append(pred_val.cpu().numpy())
@@ -253,8 +241,6 @@ if __name__ == "__main__":
                         print(f"Early stopping at epoch {epoch + 1}")
                         break
 
-    ### test
-    # load the best model and evaluate on the test set
     best_model_path = top_models[0][1]
     model.load_state_dict(torch.load(best_model_path))
 
@@ -268,11 +254,13 @@ if __name__ == "__main__":
             x_cont_batch = x_cont_batch.to(device)
             y_batch = y_batch.to(device)
 
+            if args.with_drug_string:
+                x_high_card_batch = [texts for texts in x_high_card_batch]
+
             pred_test = model(x_categ_batch, x_cont_batch, x_high_card_batch)
             test_preds.append(pred_test.cpu().numpy())
             test_labels.append(y_batch.cpu().numpy())
 
-    # calculate and print the final evaluation metrics
     test_preds = np.concatenate(test_preds)
     test_labels = np.concatenate(test_labels)
     test_loss = mean_squared_error(test_labels, test_preds)
