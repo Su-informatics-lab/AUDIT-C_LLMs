@@ -130,6 +130,10 @@ class CatTransformer(nn.Module):
 
         if self.num_high_card_categories > 0:
             assert x_high_card_categ is not None, 'You must pass in high-cardinality category values'
+            print(f"{x_high_card_categ=}")
+            print(f"{len(x_high_card_categ)=}")
+            print(f"{x_categ=}")
+            print(f"{x_categ.shape=}")
             assert len(x_high_card_categ) == x_categ.shape[0], 'The batch size of high-cardinality features must match the categorical features batch size'
         else:
             assert x_high_card_categ is None, 'High-cardinality category values should be None when num_high_card_categories is 0'
