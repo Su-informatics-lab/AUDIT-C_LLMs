@@ -96,32 +96,28 @@ class CatTransformer(nn.Module):
                                                  dropout=transformer_dropout)
         self.transformer = TransformerEncoder(encoder_layers, num_layers=depth)
 
-        transformer_input_size = dim * (self.num_categories + num_high_card_categories)
-        input_size = transformer_input_size + num_continuous
-        hidden_dimensions = [input_size * t for t in mlp_hidden_mults]
-        all_dimensions = [input_size, *hidden_dimensions, dim_out]
+        self.transformer_input_size = dim * (self.num_categories + self.num_high_card_categories)
+        self.mlp_input_size = self.transformer_input_size + num_continuous
+        self.hidden_dimensions = [self.mlp_input_size * t for t in mlp_hidden_mults]
+        self.all_dimensions = [self.mlp_input_size, *self.hidden_dimensions, dim_out]
 
-        self.mlp = MLP(all_dimensions, act=mlp_act)
+        self.mlp = MLP(self.all_dimensions, act=mlp_act)
 
         if self.use_lm_embeddings:
             self.lm_model, self.tokenizer = self.load_lm_model(lm_model_name)
             self.embeddings_cache_path = embeddings_cache_path
             self.embeddings_cache = self.load_embeddings_cache()
 
-    def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor,
-                x_high_card_categ: list = None) -> torch.Tensor:
+    def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor, x_high_card_categ: list = None) -> torch.Tensor:
         device = x_categ.device
         self.categories_offset = self.categories_offset.to(device)
 
-        assert x_categ.shape[
-                   1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
-        assert x_cont.shape[
-                   1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
+        assert x_categ.shape[1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
+        assert x_cont.shape[1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
 
         if self.num_high_card_categories > 0:
             assert x_high_card_categ is not None, 'You must pass in high-cardinality category values'
-            assert len(x_high_card_categ[0]) == x_categ.shape[
-                0], 'The batch size of high-cardinality features must match the categorical features batch size'
+            assert len(x_high_card_categ[0]) == x_categ.shape[0], 'The batch size of high-cardinality features must match the categorical features batch size'
         else:
             assert x_high_card_categ is None, 'High-cardinality category values should be None when num_high_card_categories is 0'
 
@@ -139,8 +135,7 @@ class CatTransformer(nn.Module):
 
         if self.use_lm_embeddings and self.num_high_card_categories > 0:
             lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
-            assert lm_cat_proj.shape[0] == x_categ.shape[
-                0], f'High-cardinality embeddings batch size must match the categorical features batch size. Got {lm_cat_proj.shape[0]} and {x_categ.shape[0]}'
+            lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1, self.dim)  # reshape to match batch size
             categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
 
         x = self.transformer(categ_embed)
@@ -198,13 +193,40 @@ class CatTransformer(nn.Module):
 
             self.save_embeddings_cache()
 
-        embeddings = [[self.embeddings_cache[text].cpu() for text in texts] for texts in
-                      x_high_card_categ]
-        embeddings = np.array(embeddings)
-        print(f'***{embeddings.shape=}***')
+        embeddings = []
+        for texts in x_high_card_categ:
+            embedding_list = [self.embeddings_cache[text] for text in texts]
+            embeddings.append(np.stack(embedding_list, axis=0))
+            print(f'***{embeddings.shape=}***')
+        embeddings = np.stack(embeddings, axis=0)
         embeddings = torch.tensor(embeddings, dtype=torch.float32).to(device)
-        print(f'***{embeddings.shape=}***')
+        print(f'***output: {embeddings.shape=}***')
         return embeddings
+
+    # def get_lm_embeddings(self, x_high_card_categ: list,
+    #                       device: torch.device) -> torch.Tensor:
+    #     new_texts = []
+    #     print(f'***{len(x_high_card_categ)=}***')
+    #     print(f'***{len(x_high_card_categ[0])=}***')
+    #     for texts in x_high_card_categ:
+    #         for text in texts:
+    #             if text not in self.embeddings_cache:
+    #                 new_texts.append(text)
+    #
+    #     if new_texts:
+    #         new_embeddings = self.compute_embeddings(new_texts, device)
+    #         for text, embedding in zip(new_texts, new_embeddings):
+    #             self.embeddings_cache[text] = embedding
+    #
+    #         self.save_embeddings_cache()
+    #
+    #     embeddings = [[self.embeddings_cache[text].cpu() for text in texts] for texts in
+    #                   x_high_card_categ]
+    #     embeddings = np.array(embeddings)
+    #     print(f'***{embeddings.shape=}***')
+    #     embeddings = torch.tensor(embeddings, dtype=torch.float32).to(device)
+    #     print(f'***{embeddings.shape=}***')
+    #     return embeddings
 
     def compute_embeddings(self, texts: list, device: torch.device) -> torch.Tensor:
         embeddings = []
@@ -220,7 +242,7 @@ class CatTransformer(nn.Module):
         pca = PCA(n_components=self.dim)
         reduced_embeddings = pca.fit_transform(embeddings)
 
-        return torch.tensor(reduced_embeddings, dtype=torch.float32)
+        return torch.tensor(reduced_embeddings, dtype=torch.float32).to(device)
 
 
 class MLP(nn.Module):
