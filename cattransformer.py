@@ -141,7 +141,8 @@ class CatTransformer(nn.Module):
             categ_embed = self.category_embed(x_categ)
 
             if self.use_shared_categ_embed:
-                shared_categ_embed = self.shared_category_embed.unsqueeze(0).repeat(categ_embed.shape[0], 1, 1)
+                shared_categ_embed = self.shared_category_embed.unsqueeze(0).repeat(
+                    categ_embed.shape[0], 1, 1)
                 shared_categ_embed = shared_categ_embed.to(device)
                 categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
 
@@ -255,9 +256,10 @@ class CatTransformerDataset(Dataset):
 
     def __getitem__(self, idx):
         if self.high_card_features:
+            high_card_sample = self.high_card_data.iloc[idx].values.flatten().tolist()
             return (self.categorical_data[idx],
                     self.continuous_data[idx],
-                    self.high_card_data.iloc[idx].tolist(),
+                    high_card_sample,
                     self.target_data[idx])
         else:
             return (self.categorical_data[idx],
