@@ -120,7 +120,7 @@ class CatTransformer(nn.Module):
 
         if self.num_high_card_categories > 0:
             assert x_high_card_categ is not None, 'You must pass in high-cardinality category values'
-            assert len(x_high_card_categ[0]) == x_categ.shape[
+            assert len(x_high_card_categ) == x_categ.shape[
                 0], 'The batch size of high-cardinality features must match the categorical features batch size'
         else:
             assert x_high_card_categ is None, 'High-cardinality category values should be None when num_high_card_categories is 0'
@@ -139,7 +139,8 @@ class CatTransformer(nn.Module):
 
         if self.use_lm_embeddings and self.num_high_card_categories > 0:
             lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
-            print(f'***{lm_cat_proj.shape}***')
+            assert lm_cat_proj.shape[0] == x_categ.shape[
+                0], f'High-cardinality embeddings batch size must match the categorical features batch size. Got {lm_cat_proj.shape[0]} and {x_categ.shape[0]}'
             categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
 
         x = self.transformer(categ_embed)
@@ -180,7 +181,8 @@ class CatTransformer(nn.Module):
         with open(self.embeddings_cache_path, 'wb') as f:
             pickle.dump(self.embeddings_cache, f)
 
-    def get_lm_embeddings(self, x_high_card_categ: list, device: torch.device) -> torch.Tensor:
+    def get_lm_embeddings(self, x_high_card_categ: list,
+                          device: torch.device) -> torch.Tensor:
         new_texts = []
 
         for texts in x_high_card_categ:
@@ -195,7 +197,8 @@ class CatTransformer(nn.Module):
 
             self.save_embeddings_cache()
 
-        embeddings = [[self.embeddings_cache[text].cpu() for text in texts] for texts in x_high_card_categ]
+        embeddings = [[self.embeddings_cache[text].cpu() for text in texts] for texts in
+                      x_high_card_categ]
         embeddings = np.array(embeddings)
         embeddings = torch.tensor(embeddings, dtype=torch.float32).to(device)
         return embeddings
@@ -203,7 +206,9 @@ class CatTransformer(nn.Module):
     def compute_embeddings(self, texts: list, device: torch.device) -> torch.Tensor:
         embeddings = []
         for text in tqdm(texts, desc="Computing LM embeddings"):
-            inputs = self.tokenizer(text, return_tensors='pt', truncation=True, padding=True, max_length=self.lm_max_length).to(device)
+            inputs = self.tokenizer(text, return_tensors='pt', truncation=True,
+                                    padding=True, max_length=self.lm_max_length).to(
+                device)
             outputs = self.lm_model(**inputs)
             cls_embedding = outputs.last_hidden_state[:, 0, :].detach().cpu().numpy()
             embeddings.append(cls_embedding)
