@@ -259,3 +259,4 @@ if __name__ == "__main__":
     wandb.log(
         {"test_loss": test_loss, **{f"test/{k}": v for k, v in test_metrics.items()}}
     )
+
