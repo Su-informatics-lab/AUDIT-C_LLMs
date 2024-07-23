@@ -165,28 +165,21 @@ if __name__ == "__main__":
     assert len(categories) == len(categorical_features)
 
     model = CatTransformer(
-        categories=categories,
-        # a list containing the number of unique values (i.e., levels) within each easily encodable category (categories of low cardinality)
-        num_high_card_categories=0 if not args.with_drug_string else 1,
-        # fall back to a TabTransformer if no high_card_categ is in place
+        categories=categories, # a list containing the number of unique values (i.e., levels) within each easily encodable category (categories of low cardinality)
+        num_high_card_categories=0 if not args.with_drug_string else 1, # fall back to a TabTransformer if no high_card_categ is in place
         num_continuous=len(continuous_features),  # number of continuous variables
         dim=32,  # input dimension/embedding size, paper set at 32
         depth=6,  # number of stacking transformer blocks, paper recommended 6
         heads=8,  # number of attention heads, paper recommends 8
         dim_head=16,  # vector length for each attention head
         dim_out=1,  # output dimension, fixed to 1 for regression
-        mlp_hidden_mults=(4, 2),
-        # defines number of hidden layers of final MLP and multiplier of (bottom to top) input_size of (dim * num_categories) + num_continuous + dim
+        mlp_hidden_mults=(4, 2),  # defines number of hidden layers of final MLP and multiplier of (bottom to top) input_size of (dim * num_categories) + num_continuous + dim
         mlp_act=nn.SiLU(),  # activation function for MLP
-        continuous_mean_std=cont_mean_std,
-        # precomputed mean/std for continuous variables
+        continuous_mean_std=cont_mean_std,  # precomputed mean/std for continuous variables
         transformer_dropout=0.1,  # dropout for attention and residual links
-        use_shared_categ_embed=True,
-        # share a fixed-length embeddings indicating the levels from the same column
-        shared_categ_dim_divisor=8,
-        # 1/8 of cat_embedding dims are shared in CatCTransformer
-        lm_model_name='UFNLP/gatortron-base',
-        # Hugging Face BERT variant model name, and we recommend `Su-informatics-lab/gatortron_base_rxnorm_babbage_v2`
+        use_shared_categ_embed=True,  # share a fixed-length embeddings indicating the levels from the same column
+        shared_categ_dim_divisor=8,  # 1/8 of cat_embedding dims are shared in CatCTransformer
+        lm_model_name='UFNLP/gatortron-base',  # Hugging Face BERT variant model name, and we recommend `Su-informatics-lab/gatortron_base_rxnorm_babbage_v2`
         lm_max_length=512,  # max tokens for LM embedding computation
         embeddings_cache_path='.lm_embeddings.pkl'  # path to cache embeddings
     ).to(device)
@@ -240,9 +233,9 @@ if __name__ == "__main__":
                 print(
                     f"Epoch [{epoch + 1}/{num_epochs}], Step [{total_steps}], Average Loss: {avg_loss:.4f}, C-Index: {c_index:.4f}"
                 )
-                running_loss = 0.0  # Reset running loss after printing
+                running_loss = 0.0  # reset running loss after printing
 
-                # Evaluate on validation set
+                # evaluate on validation set
                 model.eval()
                 eval_preds = []
                 eval_labels = []
