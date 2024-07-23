@@ -195,7 +195,7 @@ class CatTransformer(nn.Module):
 
             self.save_embeddings_cache()
 
-        embeddings = [[self.embeddings_cache[text] for text in texts] for texts in
+        embeddings = [[self.embeddings_cache[text].cpu() for text in texts] for texts in
                       x_high_card_categ]
         embeddings = np.array(embeddings)
         embeddings = torch.tensor(embeddings, dtype=torch.float32).to(device)
