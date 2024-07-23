@@ -61,7 +61,7 @@ if __name__ == "__main__":
                         help="if use drug data; set to False will only use demo + como (as a TabTransformer)")
     parser.add_argument("--learning_rate", type=float, default=1e-5)
     parser.add_argument("--num_epochs", type=int, default=1000)
-    parser.add_argument("--batch_size", type=int, default 64)
+    parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--eval_interval", type=int, default=1000)
     parser.add_argument("--patience", type=int, default=1000,
                         help='early stopping patience')
@@ -115,7 +115,9 @@ if __name__ == "__main__":
     ]
 
     continuous_features = ["age"]
-    pred_vars = ["audit.c.score", "q1.score", "q2.score", "q3.score"]
+    # we can do this
+    # pred_vars = ["q1.score", "q2.score", "q3.score"]
+    pred_vars = ["audit.c.score"]
     all_cols = categorical_features + continuous_features + pred_vars
 
     if args.with_drug_string:
