@@ -11,7 +11,7 @@ from sklearn.metrics import mean_squared_error
 from torch import optim
 from torch.utils.data import DataLoader, RandomSampler, TensorDataset
 
-from cattransformer import CatTransformer
+from cattransformer import CatTransformer, CatTransformerDataset
 from utils import PROJECT_NAME, SEED, compute_metrics
 
 # for reproducibility
@@ -19,7 +19,6 @@ torch.manual_seed(SEED)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
-
 
 def save_model(model, eval_loss, top_models, run_name):
     model_dir = f"ckpts/{run_name}"
@@ -61,8 +60,8 @@ if __name__ == "__main__":
     parser.add_argument("--with_drug_string", action='store_true', default=False,
                         help="if use drug data; set to False will only use demo + como (as a TabTransformer)")
     parser.add_argument("--learning_rate", type=float, default=1e-5)
-    parser.add_argument("--num_epochs", type=int, default=200)
-    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--num_epochs", type=int, default=1000)
+    parser.add_argument("--batch_size", type=int, default 64)
     parser.add_argument("--eval_interval", type=int, default=1000)
     parser.add_argument("--patience", type=int, default=1000,
                         help='early stopping patience')
@@ -116,38 +115,19 @@ if __name__ == "__main__":
     ]
 
     continuous_features = ["age"]
-    pred_var = ["audit.c.score"]
-    all_cols = categorical_features + continuous_features + pred_var
+    pred_vars = ["audit.c.score", "q1.score", "q2.score", "q3.score"]
+    all_cols = categorical_features + continuous_features + pred_vars
 
     if args.with_drug_string:
-        all_cols += ['standard_concept_name']
+        high_card_features = ['standard_concept_name']
+        all_cols += high_card_features
+    else:
+        high_card_features = []
 
     df_train = df.loc[df["split"] == "train"][all_cols]  # 20,536 individuals * 23 cols
     df_val = df.loc[df["split"] == "validation"][
         all_cols]  # 2,000 individuals * 23 cols
     df_test = df.loc[df["split"] == "test"][all_cols]  # 5,000 individuals * 23 cols
-
-    # convert the train, validation, and test sets to tensors
-    x_categ_train = torch.tensor(df_train[categorical_features].values,
-                                 dtype=torch.long).to(device)
-    x_cont_train = torch.tensor(df_train[continuous_features].values,
-                                dtype=torch.float).to(device)
-    y_train = torch.tensor(df_train["audit.c.score"].values,
-                           dtype=torch.float).unsqueeze(1).to(device)
-
-    x_categ_val = torch.tensor(df_val[categorical_features].values,
-                               dtype=torch.long).to(device)
-    x_cont_val = torch.tensor(df_val[continuous_features].values, dtype=torch.float).to(
-        device)
-    y_val = torch.tensor(df_val["audit.c.score"].values, dtype=torch.float).unsqueeze(
-        1).to(device)
-
-    x_categ_test = torch.tensor(df_test[categorical_features].values,
-                                dtype=torch.long).to(device)
-    x_cont_test = torch.tensor(df_test[continuous_features].values,
-                               dtype=torch.float).to(device)
-    y_test = torch.tensor(df_test["audit.c.score"].values, dtype=torch.float).unsqueeze(
-        1).to(device)
 
     cont_mean_std = (
         torch.Tensor(
@@ -164,15 +144,23 @@ if __name__ == "__main__":
     categories = [len(df_train[c].unique()) for c in categorical_features]
     assert len(categories) == len(categorical_features)
 
+    train_dataset = CatTransformerDataset(df_train, categorical_features, continuous_features, pred_vars, high_card_features)
+    val_dataset = CatTransformerDataset(df_val, categorical_features, continuous_features, pred_vars, high_card_features)
+    test_dataset = CatTransformerDataset(df_test, categorical_features, continuous_features, pred_vars, high_card_features)
+
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, sampler=RandomSampler(train_dataset))
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+
     model = CatTransformer(
         categories=categories, # a list containing the number of unique values (i.e., levels) within each easily encodable category (categories of low cardinality)
-        num_high_card_categories=0 if not args.with_drug_string else 1, # fall back to a TabTransformer if no high_card_categ is in place
+        num_high_card_categories=0 if not args.with_drug_string else len(high_card_features), # fall back to a TabTransformer if no high_card_categ is in place
         num_continuous=len(continuous_features),  # number of continuous variables
         dim=32,  # input dimension/embedding size, paper set at 32
         depth=6,  # number of stacking transformer blocks, paper recommended 6
         heads=8,  # number of attention heads, paper recommends 8
         dim_head=16,  # vector length for each attention head
-        dim_out=1,  # output dimension, fixed to 1 for regression
+        dim_out=len(pred_vars),  # output dimension, set to 1 for plain regression/classification
         mlp_hidden_mults=(4, 2),  # defines number of hidden layers of final MLP and multiplier of (bottom to top) input_size of (dim * num_categories) + num_continuous + dim
         mlp_act=nn.SiLU(),  # activation function for MLP
         continuous_mean_std=cont_mean_std,  # precomputed mean/std for continuous variables
@@ -188,16 +176,6 @@ if __name__ == "__main__":
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
     num_epochs = args.num_epochs
-    batch_size = args.batch_size
-
-    train_dataset = TensorDataset(x_categ_train, x_cont_train, y_train)
-    val_dataset = TensorDataset(x_categ_val, x_cont_val, y_val)
-    test_dataset = TensorDataset(x_categ_test, x_cont_test, y_test)
-    train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, sampler=RandomSampler(train_dataset)
-    )
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     # early stopping and model saving settings
     early_stopping_steps = args.patience
@@ -211,13 +189,13 @@ if __name__ == "__main__":
         running_loss = 0.0
         total_steps = 0
 
-        for step, (x_categ_batch, x_cont_batch, y_batch) in enumerate(train_loader):
+        for step, (x_categ_batch, x_cont_batch, x_high_card_batch, y_batch) in enumerate(train_loader):
             x_categ_batch = x_categ_batch.to(device)
             x_cont_batch = x_cont_batch.to(device)
             y_batch = y_batch.to(device)
 
             optimizer.zero_grad()
-            pred_train = model(x_categ_batch, x_cont_batch)
+            pred_train = model(x_categ_batch, x_cont_batch, x_high_card_batch)
             loss = criterion(pred_train, y_batch)
             loss.backward()
             optimizer.step()
@@ -240,12 +218,12 @@ if __name__ == "__main__":
                 eval_preds = []
                 eval_labels = []
                 with torch.no_grad():
-                    for x_categ_batch, x_cont_batch, y_batch in val_loader:
+                    for x_categ_batch, x_cont_batch, x_high_card_batch, y_batch in val_loader:
                         x_categ_batch = x_categ_batch.to(device)
                         x_cont_batch = x_cont_batch.to(device)
                         y_batch = y_batch.to(device)
 
-                        pred_val = model(x_categ_batch, x_cont_batch)
+                        pred_val = model(x_categ_batch, x_cont_batch, x_high_card_batch)
                         eval_preds.append(pred_val.cpu().numpy())
                         eval_labels.append(y_batch.cpu().numpy())
 
@@ -283,12 +261,12 @@ if __name__ == "__main__":
     test_labels = []
 
     with torch.no_grad():
-        for x_categ_batch, x_cont_batch, y_batch in test_loader:
+        for x_categ_batch, x_cont_batch, x_high_card_batch, y_batch in test_loader:
             x_categ_batch = x_categ_batch.to(device)
             x_cont_batch = x_cont_batch.to(device)
             y_batch = y_batch.to(device)
 
-            pred_test = model(x_categ_batch, x_cont_batch)
+            pred_test = model(x_categ_batch, x_cont_batch, x_high_card_batch)
             test_preds.append(pred_test.cpu().numpy())
             test_labels.append(y_batch.cpu().numpy())
 
