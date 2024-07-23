@@ -31,33 +31,23 @@ class CatTransformer(nn.Module):
     def __init__(
             self,
             *,
-            categories: list,
-            # a list containing the number of unique values (i.e., levels) within each easily encodable category (categories of low cardinality)
-            num_high_card_categories: int,
-            # number of high-cardinality variables whose levels need to be derived from an LM; if set to 0, if falls back to a TabTransformer (https://arxiv.org/abs/2012.06678)
+            categories: list,  # a list containing the number of unique values (i.e., levels) within each easily encodable category (categories of low cardinality)
+            num_high_card_categories: int,  # number of high-cardinality variables whose levels need to be derived from an LM; if set to 0, if falls back to a TabTransformer (https://arxiv.org/abs/2012.06678)
             num_continuous: int,  # number of continuous variables
             dim: int,  # input dimension/embedding size, paper set at 32
-            depth: int = 6,
-            # number of stacking transformer blocks, paper recommended 6
+            depth: int = 6,  # number of stacking transformer blocks, paper recommended 6
             heads: int = 8,  # number of attention heads, paper recommends 8
             dim_head: int = 16,  # vector length for each attention head
             dim_out: int = 1,  # output dimension, fixed to 1 for regression
-            mlp_hidden_mults: tuple = (4, 2),
-            # defines number of hidden layers of final MLP and multiplier of (bottom to top) input_size of (dim * num_categories) + num_continuous + dim
+            mlp_hidden_mults: tuple = (4, 2),  # defines number of hidden layers of final MLP and multiplier of (bottom to top) input_size of (dim * num_categories) + num_continuous + dim
             mlp_act: nn.Module = nn.SiLU(),  # activation function for MLP
-            continuous_mean_std: torch.Tensor = None,
-            # precomputed mean/std for continuous variables
-            transformer_dropout: float = 0.1,
-            # dropout for attention and residual links
-            use_shared_categ_embed: bool = True,
-            # share a fixed-length embeddings indicating the levels from the same column
-            shared_categ_dim_divisor: int = 8,
-            # 1/8 of cat_embedding dims are shared in CatTransformer
-            lm_model_name: str = 'distilbert/distilbert-base-uncased',
-            # Hugging Face BERT variant model name, and we recommend `Su-informatics-lab/gatortron_base_rxnorm_babbage_v2`
+            continuous_mean_std: torch.Tensor = None,  # precomputed mean/std for continuous variables
+            transformer_dropout: float = 0.1,  # dropout for attention and residual links
+            use_shared_categ_embed: bool = True,  # share a fixed-length embeddings indicating the levels from the same column
+            shared_categ_dim_divisor: int = 8,  # 1/8 of cat_embedding dims are shared in CatTransformer
+            lm_model_name: str = 'distilbert/distilbert-base-uncased',  # Hugging Face BERT variant model name, and we recommend `Su-informatics-lab/gatortron_base_rxnorm_babbage_v2`
             lm_max_length: int = 512,  # max tokens for LM embedding computation
-            embeddings_cache_path: str = '.lm_embeddings.pkl'
-            # path to cache embeddings
+            embeddings_cache_path: str = '.lm_embeddings.pkl'  # path to cache embeddings
     ) -> None:
         super().__init__()
         assert all(map(lambda n: n > 0,
