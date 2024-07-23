@@ -184,7 +184,8 @@ class CatTransformer(nn.Module):
     def get_lm_embeddings(self, x_high_card_categ: list,
                           device: torch.device) -> torch.Tensor:
         new_texts = []
-
+        print(f'***{len(x_high_card_categ)=}***')
+        print(f'***{len(x_high_card_categ[0])=}***')
         for texts in x_high_card_categ:
             for text in texts:
                 if text not in self.embeddings_cache:
