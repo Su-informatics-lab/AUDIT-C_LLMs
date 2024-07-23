@@ -256,3 +256,29 @@ class CatTransformer(nn.Module):
                         self.continuous_data[idx],
                         None,
                         self.target_data[idx])
+
+class CatTransformerDataset(Dataset):
+    def __init__(self, df, categorical_features, continuous_features, pred_vars, high_card_features=[]):
+        self.categorical_data = torch.tensor(df[categorical_features].values, dtype=torch.long)
+        self.continuous_data = torch.tensor(df[continuous_features].values, dtype=torch.float)
+        self.target_data = torch.tensor(df[pred_vars].values, dtype=torch.float)
+        self.high_card_features = high_card_features
+
+        if high_card_features:
+            self.high_card_data = df[high_card_features].reset_index(drop=True)
+
+    def __len__(self):
+        return len(self.categorical_data)
+
+    def __getitem__(self, idx):
+        if self.high_card_features:
+            high_card_sample = self.high_card_data.iloc[idx].tolist()
+            return (self.categorical_data[idx],
+                    self.continuous_data[idx],
+                    high_card_sample,
+                    self.target_data[idx])
+        else:
+            return (self.categorical_data[idx],
+                    self.continuous_data[idx],
+                    None,
+                    self.target_data[idx])
