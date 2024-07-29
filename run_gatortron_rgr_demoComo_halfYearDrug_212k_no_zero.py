@@ -154,7 +154,7 @@ if __name__ == "__main__":
         df.drop(columns=comorbidity_columns, inplace=True)
         return df
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
     train_df = preprocess_df_for_lm(df.loc[df.split == 'train'])
     val_df = preprocess_df_for_lm(df.loc[df.split == 'validation'])
