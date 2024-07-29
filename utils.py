@@ -8,7 +8,7 @@ CSV_THREE_DRUG_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/
 DEMO_COMO_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_CX_04052024.parquet'
 DEMO_COMO_THREE_DRUG_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_DEMO_COMO_THREE_DRUG_05032024.parquet'
 MODEL_NAME = 'google/flan-t5-base'
-PROJECT_NAME = 'AUDIT-C_LLMs'
+PROJECT_NAME = 'AUDIT-C_LLMs_NO_ZERO'
 SEED = 6179
 
 MAX_LENGTH = 256
@@ -16,6 +16,59 @@ MAX_OUTPUT_LENGTH = 4
 HEAD = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C) "
         "from 0 to 12 based on the provided demographics and comorbidity data:\n")
 TAIL = "\n### AUDIT-C Score:"
+
+
+def period_separated_narrative_formatting(a_row):
+    """
+    Concatenates all the indicative columns into a single string for LLM consumption.
+
+    Note:
+        - Fields 'q1.score', 'q2.score', 'q3.score', 'audit.c.score', 'person_id', and
+        'split' are ignored.
+        - Numerated concept_names and drug_exposure_start_dates are renamed for
+            stylistic consistency.
+        - Most recent drug use is closer to comorbidity.
+
+    An example is shown below.
+        ```gender: Female; race: White; ethnicity: Non-Hispanic; age: 45;
+        Rheumatic Disease; Diabetes wo C; Metastatic Solid Tumor; Liver Disease Moderate
+        Severe; Recent drug: DrugA, DrugB, DrugC.```
+
+    Args:
+        a_row: A row in dataframe.
+    Returns:
+        A string of demographics, comorbidity, and drug use of a specific person.
+    """
+    demographics = []
+    comorbidities = []
+    drugs = []
+    for k, v in a_row.items():
+        if k in ['q1.score', 'q2.score', 'q3.score',
+                 'audit.c.score', 'person_id', 'split']:
+            continue
+        elif k in ['gender', 'race', 'ethnicity', 'age']:
+            demographics.append(f"{k}: {v}")
+        elif k == 'comorbidity':
+            comorbidities.append(f'Comorbidity: {v}')
+        elif k == 'standard_concept_name':
+            drugs.append(f'Recent drug: {v}.')
+        else:
+            raise ValueError(f'Unknown key {k}')
+    formatted_row = demographics + comorbidities + drugs
+    return "; ".join(formatted_row)
+
+
+def comorbidities_to_narrative(row, comorbidity_columns):
+    """
+    Converts comorbidity columns to narratives.
+    """
+    narratives = []
+    for col in comorbidity_columns:
+        if row[col] == 1:
+            narratives.append(col.replace('_', ' '))
+    if not narratives:
+        return 'None'
+    return ', '.join(narratives)
 
 
 def period_separated_column_concatenation_formatting(a_row, with_date=True):
