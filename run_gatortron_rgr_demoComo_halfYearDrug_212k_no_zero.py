@@ -113,7 +113,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--run_name",
-        help="like 'gatrotron_rgr_demo_como_threeDrug_linear_head'"
+        help="like 'gatortron_rgr_demo_como_threeDrug_linear_head'"
     )
     args = parser.parse_args()
 
@@ -136,6 +136,7 @@ if __name__ == "__main__":
 
     def preprocess_df_for_lm(df):
         # convert " | " concatenated drug names to more readable forms
+        df = df.copy()
         df.loc[:, 'standard_concept_name'] = df['standard_concept_name'].str.replace(' | ', ', ')
         comorbidity_columns = [
             'Renal_Disease_Severe', 'Renal_Disease_Mild_Moderate', 'Myocardial_Infarction',
