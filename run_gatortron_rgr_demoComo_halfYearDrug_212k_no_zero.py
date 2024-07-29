@@ -165,8 +165,8 @@ if __name__ == "__main__":
     test_dataset = GatorTron_Dataset(test_df, tokenizer)
 
     # init model
-    config = AutoConfig.from_pretrained(MODEL_NAME, num_labels=1)  # for regression
-    model = GatorTron_Regresser(MODEL_NAME, args.non_linear_head).to(device)
+    config = AutoConfig.from_pretrained(args.model_name, num_labels=1)  # for regression
+    model = GatorTron_Regresser(args.model_name, args.non_linear_head).to(device)
 
     training_args = TrainingArguments(
         output_dir=os.path.join("ckpts", args.run_name),
