@@ -19,8 +19,7 @@ from transformers import (AutoConfig, AutoModel, AutoTokenizer,
                           TrainingArguments)
 
 from utils import (comorbidities_to_narrative, PROJECT_NAME, SEED,
-                   compute_metrics, period_separated_narrative_formatting,
-                   period_separated_column_concatenation_formatting)
+                   compute_metrics, period_separated_narrative_formatting)
 
 __author__ = "hw56@indiana.edu"
 __version__ = "0.0.1"
