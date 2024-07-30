@@ -49,7 +49,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Train a CatTransformer for AUDIT-C Scoring."
     )
-    parser.add_argument("--with_drug_string", action='store_true', default=False,
+    parser.add_argument("--with_drug", action='store_true', default=False,
                         help="if use drug data; set to False will only use demo + como (as a TabTransformer)")
     parser.add_argument("--learning_rate", type=float, default=1e-5)
     parser.add_argument("--num_epochs", type=int, default=1000)
@@ -108,7 +108,7 @@ if __name__ == "__main__":
     pred_vars = ["audit.c.score"]
     all_cols = categorical_features + continuous_features + pred_vars
 
-    if args.with_drug_string:
+    if args.with_drug:
         high_card_features = ['standard_concept_name']
         all_cols += high_card_features
     else:
@@ -142,7 +142,7 @@ if __name__ == "__main__":
 
     model = CatTransformer(
         categories=categories, # a list containing the number of unique values (i.e., levels) within each easily encodable category (categories of low cardinality)
-        num_high_card_categories=0 if not args.with_drug_string else len(high_card_features), # fall back to a TabTransformer if no high_card_categ is in place
+        num_high_card_categories=0 if not args.with_drug else len(high_card_features), # fall back to a TabTransformer if no high_card_categ is in place
         num_continuous=len(continuous_features),  # number of continuous variables
         dim=32,  # input dimension/embedding size, paper set at 32
         depth=6,  # number of stacking transformer blocks, paper recommended 6
