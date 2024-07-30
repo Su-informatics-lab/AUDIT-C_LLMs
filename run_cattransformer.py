@@ -157,8 +157,7 @@ if __name__ == "__main__":
         shared_categ_dim_divisor=8,  # 1/8 of cat_embedding dims are shared in CatCTransformer
         lm_model_name='UFNLP/gatortron-base',  # Hugging Face BERT variant model name, and we recommend `Su-informatics-lab/gatortron_base_rxnorm_babbage_v2`
         lm_max_length=512,  # max tokens for LM embedding computation
-        original_embeddings_cache_path='.lm_embeddings.pkl',  # path to cache original embeddings
-        pca_embeddings_cache_path='.pca_lm_embeddings.pkl'  # path to cache PCA-transformed embeddings
+        embeddings_cache_path='.lm_embeddings.pkl',  # path to cache embeddings derived from an lm
     ).to(device)
 
     # print the total number of parameters in the model
