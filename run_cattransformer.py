@@ -11,9 +11,9 @@ from sklearn.metrics import mean_squared_error
 from torch import optim
 from torch.utils.data import DataLoader, RandomSampler
 
-from cattransformer import CatTransformer, CatTransformerDataset
+from cattransformer import CatTransformer, CatTransformerDataset, count_parameters
 from utils import (DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH,
-                   PROJECT_NAME, SEED, compute_metrics, count_parameters)
+                   PROJECT_NAME, SEED, compute_metrics)
 
 torch.manual_seed(SEED)
 
@@ -161,8 +161,11 @@ if __name__ == "__main__":
     ).to(device)
 
     # print the total number of parameters in the model
-    total_params = count_parameters(model)
-    print(f"Total number of parameters in the model: {total_params}")
+    param_counts = count_parameters(model)
+    print(f"Embedding Parameters: {param_counts['embedding_params']}")
+    print(f"Transformer Parameters: {param_counts['transformer_params']}")
+    print(f"MLP Parameters: {param_counts['mlp_params']}")
+    print(f"Total Parameters: {param_counts['total_params']}")
 
     # training settings
     criterion = nn.MSELoss()

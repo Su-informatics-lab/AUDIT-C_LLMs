@@ -333,3 +333,25 @@ class CatTransformerDataset(Dataset):
                 self.continuous_data[idx],
                 high_card_sample,
                 self.target_data[idx])
+
+def count_parameters(model):
+    embedding_params = 0
+    transformer_params = 0
+    mlp_params = 0
+    total_params = 0
+
+    for name, param in model.named_parameters():
+        if "category_embed" in name or "shared_category_embed" in name:
+            embedding_params += param.numel()
+        elif "transformer" in name:
+            transformer_params += param.numel()
+        elif "mlp" in name:
+            mlp_params += param.numel()
+        total_params += param.numel()
+
+    return {
+        "embedding_params": embedding_params,
+        "transformer_params": transformer_params,
+        "mlp_params": mlp_params,
+        "total_params": total_params
+    }
