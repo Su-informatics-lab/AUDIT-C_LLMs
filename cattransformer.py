@@ -130,8 +130,14 @@ class CatTransformer(nn.Module):
                 shared_categ_embed = shared_categ_embed.to(device)
                 categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
 
-        # only process high-cardinality features if they are present
-        if self.num_high_card_categories > 0 and x_high_card_categ.size(1) > 0:
+        # Convert list to tensor if high cardinality features are present
+        if self.use_lm_embeddings and self.num_high_card_categories > 0 and x_high_card_categ:
+            # Ensure x_high_card_categ is a tensor
+            if isinstance(x_high_card_categ, list):
+                x_high_card_categ = [torch.tensor(hc, dtype=torch.long, device=device)
+                                     for hc in x_high_card_categ]
+                x_high_card_categ = torch.stack(x_high_card_categ)
+
             lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
             lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1,
                                            self.dim)  # reshape to match batch size
@@ -154,18 +160,15 @@ class CatTransformer(nn.Module):
 
         return logits
 
-    # def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor, x_high_card_categ: list = None) -> torch.Tensor:
+    # def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor,
+    #             x_high_card_categ: Optional[List[str]]) -> torch.Tensor:
     #     device = x_categ.device
     #     self.categories_offset = self.categories_offset.to(device)
     #
-    #     assert x_categ.shape[1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
-    #     assert x_cont.shape[1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
-    #
-    #     if self.num_high_card_categories > 0:
-    #         assert x_high_card_categ is not None, 'You must pass in high-cardinality category values'
-    #         assert len(x_high_card_categ[0]) == x_categ.shape[0], 'The batch size of high-cardinality features must match the categorical features batch size'
-    #     else:
-    #         assert x_high_card_categ is None, 'High-cardinality category values should be None when num_high_card_categories is 0'
+    #     assert x_categ.shape[
+    #                1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
+    #     assert x_cont.shape[
+    #                1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
     #
     #     x_categ = self.handle_missing_data(x_categ)
     #
@@ -179,9 +182,11 @@ class CatTransformer(nn.Module):
     #             shared_categ_embed = shared_categ_embed.to(device)
     #             categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
     #
-    #     if self.use_lm_embeddings and self.num_high_card_categories > 0:
+    #     # only process high-cardinality features if they are present
+    #     if self.num_high_card_categories > 0 and x_high_card_categ.size(1) > 0:
     #         lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
-    #         lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1, self.dim)  # reshape to match batch size
+    #         lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1,
+    #                                        self.dim)  # reshape to match batch size
     #         categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
     #
     #     x = self.transformer(categ_embed)
