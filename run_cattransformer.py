@@ -65,7 +65,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--run_name",
-        help="like 'CatTransformer_demo_como_halfYearDrug'"
+        help="like 'CatTransformer_demo_como_noZeroAUDICT'"
     )
     args = parser.parse_args()
 

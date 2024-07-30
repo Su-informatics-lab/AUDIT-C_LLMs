@@ -108,18 +108,15 @@ class CatTransformer(nn.Module):
             self.embeddings_cache_path = embeddings_cache_path
             self.embeddings_cache = self.load_embeddings_cache()
 
-    def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor, x_high_card_categ: list = None) -> torch.Tensor:
+    def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor,
+                x_high_card_categ: torch.Tensor) -> torch.Tensor:
         device = x_categ.device
         self.categories_offset = self.categories_offset.to(device)
 
-        assert x_categ.shape[1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
-        assert x_cont.shape[1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
-
-        if self.num_high_card_categories > 0:
-            assert x_high_card_categ is not None, 'You must pass in high-cardinality category values'
-            assert len(x_high_card_categ[0]) == x_categ.shape[0], 'The batch size of high-cardinality features must match the categorical features batch size'
-        else:
-            assert x_high_card_categ is None, 'High-cardinality category values should be None when num_high_card_categories is 0'
+        assert x_categ.shape[
+                   1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
+        assert x_cont.shape[
+                   1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
 
         x_categ = self.handle_missing_data(x_categ)
 
@@ -133,9 +130,11 @@ class CatTransformer(nn.Module):
                 shared_categ_embed = shared_categ_embed.to(device)
                 categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
 
-        if self.use_lm_embeddings and self.num_high_card_categories > 0:
+        # only process high-cardinality features if they are present
+        if self.num_high_card_categories > 0 and x_high_card_categ.size(1) > 0:
             lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
-            lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1, self.dim)  # reshape to match batch size
+            lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1,
+                                           self.dim)  # reshape to match batch size
             categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
 
         x = self.transformer(categ_embed)
@@ -154,6 +153,53 @@ class CatTransformer(nn.Module):
         logits = self.mlp(x)
 
         return logits
+
+    # def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor, x_high_card_categ: list = None) -> torch.Tensor:
+    #     device = x_categ.device
+    #     self.categories_offset = self.categories_offset.to(device)
+    #
+    #     assert x_categ.shape[1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
+    #     assert x_cont.shape[1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
+    #
+    #     if self.num_high_card_categories > 0:
+    #         assert x_high_card_categ is not None, 'You must pass in high-cardinality category values'
+    #         assert len(x_high_card_categ[0]) == x_categ.shape[0], 'The batch size of high-cardinality features must match the categorical features batch size'
+    #     else:
+    #         assert x_high_card_categ is None, 'High-cardinality category values should be None when num_high_card_categories is 0'
+    #
+    #     x_categ = self.handle_missing_data(x_categ)
+    #
+    #     if self.num_unique_categories > 0:
+    #         x_categ = x_categ + self.categories_offset
+    #         categ_embed = self.category_embed(x_categ)
+    #
+    #         if self.use_shared_categ_embed:
+    #             shared_categ_embed = self.shared_category_embed.unsqueeze(0).repeat(
+    #                 categ_embed.shape[0], 1, 1)
+    #             shared_categ_embed = shared_categ_embed.to(device)
+    #             categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
+    #
+    #     if self.use_lm_embeddings and self.num_high_card_categories > 0:
+    #         lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
+    #         lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1, self.dim)  # reshape to match batch size
+    #         categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
+    #
+    #     x = self.transformer(categ_embed)
+    #     flat_categ = x.flatten(start_dim=1)
+    #
+    #     if self.num_continuous > 0:
+    #         if self.continuous_mean_std is not None:
+    #             mean, std = self.continuous_mean_std.unbind(dim=-1)
+    #             x_cont = (x_cont - mean) / std
+    #
+    #         normed_cont = self.cont_norm(x_cont)
+    #         x = torch.cat((flat_categ, normed_cont), dim=1)
+    #     else:
+    #         x = flat_categ
+    #
+    #     logits = self.mlp(x)
+    #
+    #     return logits
 
     def handle_missing_data(self, x_categ: torch.Tensor) -> torch.Tensor:
         missing_data_mask = (x_categ == 'na') | (x_categ == 'missing') | (
@@ -264,7 +310,7 @@ class CatTransformerDataset(Dataset):
     def __len__(self) -> int:
         return len(self.categorical_data)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, Optional[List[str]], torch.Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Retrieves a single sample from the dataset.
 
@@ -279,12 +325,11 @@ class CatTransformerDataset(Dataset):
         """
         if self.high_card_features:
             high_card_sample = self.high_card_data.iloc[idx].tolist()
-            return (self.categorical_data[idx],
-                    self.continuous_data[idx],
-                    high_card_sample,
-                    self.target_data[idx])
+            high_card_sample = torch.tensor(high_card_sample, dtype=torch.long)  # convert to tensor
         else:
-            return (self.categorical_data[idx],
-                    self.continuous_data[idx],
-                    None,
-                    self.target_data[idx])
+            high_card_sample = torch.tensor([], dtype=torch.long)  # empty tensor if not present
+
+        return (self.categorical_data[idx],
+                self.continuous_data[idx],
+                high_card_sample,
+                self.target_data[idx])
