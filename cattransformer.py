@@ -49,14 +49,11 @@ class CatTransformer(nn.Module):
             shared_categ_dim_divisor: int = 8,  # 1/8 of cat_embedding dims are shared in CatTransformer
             lm_model_name: str = 'distilbert/distilbert-base-uncased',  # Hugging Face BERT variant model name, and we recommend `Su-informatics-lab/gatortron_base_rxnorm_babbage_v2`
             lm_max_length: int = 512,  # max tokens for LM embedding computation
-            original_embeddings_cache_path: str = '.lm_embeddings.pkl',  # path to cache original embeddings
-            pca_embeddings_cache_path: str = '.pca_lm_embeddings.pkl'  # path to cache PCA-transformed embeddings
+            embeddings_cache_path: str = '.lm_embeddings.pkl'  # path to cache embeddings
     ) -> None:
         super().__init__()
-        assert all(map(lambda n: n > 0,
-                       categories)), 'number of each category must be positive'
-        assert len(
-            categories) + num_continuous + num_high_card_categories > 0, 'input shape must not be null'
+        assert all(map(lambda n: n > 0, categories)), 'number of each category must be positive'
+        assert len(categories) + num_continuous + num_high_card_categories > 0, 'input shape must not be null'
 
         self.num_categories = len(categories)
         self.num_high_card_categories = num_high_card_categories
@@ -66,15 +63,13 @@ class CatTransformer(nn.Module):
         self.lm_max_length = lm_max_length
 
         total_tokens = self.num_unique_categories + 1
-        shared_embed_dim = 0 if not use_shared_categ_embed else int(
-            dim // shared_categ_dim_divisor)
+        shared_embed_dim = 0 if not use_shared_categ_embed else int(dim // shared_categ_dim_divisor)
 
         self.category_embed = nn.Embedding(total_tokens, dim - shared_embed_dim)
         self.use_shared_categ_embed = use_shared_categ_embed
 
         if use_shared_categ_embed:
-            self.shared_category_embed = nn.Parameter(
-                torch.zeros(self.num_categories, shared_embed_dim))
+            self.shared_category_embed = nn.Parameter(torch.zeros(self.num_categories, shared_embed_dim))
             nn.init.normal_(self.shared_category_embed, std=0.02)
 
         if self.num_unique_categories > 0:
@@ -87,14 +82,11 @@ class CatTransformer(nn.Module):
         if self.num_continuous > 0:
             if continuous_mean_std is not None:
                 assert continuous_mean_std.shape == (num_continuous, 2), (
-                    f'continuous_mean_std must have a shape of ({num_continuous}, 2) where the last '
-                    f'dimension contains the mean and variance respectively')
+                    f'continuous_mean_std must have a shape of ({num_continuous}, 2) where the last dimension contains the mean and variance respectively')
             self.register_buffer('continuous_mean_std', continuous_mean_std)
             self.cont_norm = nn.LayerNorm(num_continuous)
 
-        encoder_layers = TransformerEncoderLayer(d_model=dim, nhead=heads,
-                                                 dim_feedforward=dim * dim_head,
-                                                 dropout=transformer_dropout)
+        encoder_layers = TransformerEncoderLayer(d_model=dim, nhead=heads, dim_feedforward=dim * dim_head, dropout=transformer_dropout)
         self.transformer = TransformerEncoder(encoder_layers, num_layers=depth)
 
         self.transformer_input_size = dim * (self.num_categories + self.num_high_card_categories)
@@ -106,15 +98,11 @@ class CatTransformer(nn.Module):
 
         if self.use_lm_embeddings:
             self.lm_model, self.tokenizer = self.load_lm_model(lm_model_name)
-            self.original_embeddings_cache_path = original_embeddings_cache_path
-            self.pca_embeddings_cache_path = pca_embeddings_cache_path
-            self.original_embeddings_cache = self.load_cache(self.original_embeddings_cache_path)
-            self.pca_embeddings_cache = self.load_cache(self.pca_embeddings_cache_path)
-            if len(self.original_embeddings_cache) > 0 and len(self.pca_embeddings_cache) == 0:
-                self.apply_pca_and_cache()
+            self.embeddings_cache_path = embeddings_cache_path
+            self.embeddings_cache = self.load_embeddings_cache()
+            self.projection_layer = nn.Linear(self.lm_model.config.hidden_size, self.dim)
 
-    def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor,
-                x_high_card_categ: Optional[List[str]]) -> torch.Tensor:
+    def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor, x_high_card_categ: Optional[List[str]]) -> torch.Tensor:
         device = x_categ.device
         self.categories_offset = self.categories_offset.to(device)
 
@@ -128,15 +116,14 @@ class CatTransformer(nn.Module):
             categ_embed = self.category_embed(x_categ)
 
             if self.use_shared_categ_embed:
-                shared_categ_embed = self.shared_category_embed.unsqueeze(0).repeat(
-                    categ_embed.shape[0], 1, 1)
+                shared_categ_embed = self.shared_category_embed.unsqueeze(0).repeat(categ_embed.shape[0], 1, 1)
                 shared_categ_embed = shared_categ_embed.to(device)
                 categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
+
             # only process high-cardinality features if they are present
             if self.num_high_card_categories > 0 and len(x_high_card_categ) > 0:
                 lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
-                lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1,
-                                               self.dim)  # reshape to match batch size
+                lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1, self.dim)  # reshape to match batch size
                 categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
 
         x = self.transformer(categ_embed)
@@ -157,8 +144,9 @@ class CatTransformer(nn.Module):
         return logits
 
     def handle_missing_data(self, x_categ: torch.Tensor) -> torch.Tensor:
-        missing_data_mask = (x_categ == 'na') | (x_categ == 'missing') | (
-                x_categ == np.nan) | (x_categ == 'NaN') | (x_categ == 'N/A')
+        missing_data_mask = ((x_categ == 'na') | (x_categ == 'missing') |
+                             (x_categ == np.nan) | (x_categ == 'NaN') |
+                             (x_categ == 'N/A'))
         x_categ[missing_data_mask] = 0
         return x_categ
 
@@ -167,55 +155,54 @@ class CatTransformer(nn.Module):
         tokenizer = AutoTokenizer.from_pretrained(lm_model_name)
         return model, tokenizer
 
-    def load_cache(self, cache_path):
-        if os.path.exists(cache_path):
-            with open(cache_path, 'rb') as f:
+    def load_embeddings_cache(self):
+        if os.path.exists(self.embeddings_cache_path):
+            with open(self.embeddings_cache_path, 'rb') as f:
                 return pickle.load(f)
         return {}
 
-    def save_cache(self, cache, cache_path) -> None:
-        with open(cache_path, 'wb') as f:
-            pickle.dump(cache, f)
+    def save_embeddings_cache(self) -> None:
+        with open(self.embeddings_cache_path, 'wb') as f:
+            pickle.dump(self.embeddings_cache, f)
 
     def get_lm_embeddings(self, x_high_card_categ: list,
                           device: torch.device) -> torch.Tensor:
+        new_texts = []
+        for texts in x_high_card_categ:
+            for text in texts:
+                if text not in self.embeddings_cache:
+                    new_texts.append(text)
+
+        if new_texts:
+            new_embeddings = self.compute_embeddings(new_texts, device)
+            for text, embedding in zip(new_texts, new_embeddings):
+                self.embeddings_cache[text] = embedding
+
+            self.save_embeddings_cache()
+
         embeddings = []
         for texts in x_high_card_categ:
-            embedding_list = [self.pca_embeddings_cache[text].cpu() for text in texts]
+            embedding_list = [self.embeddings_cache[text].cpu() for text in texts]
             embeddings.append(np.stack(embedding_list, axis=0))
         embeddings = np.stack(embeddings, axis=0)
         embeddings = torch.tensor(embeddings, dtype=torch.float32).to(device)
+        # apply projection to reduce dimensionality
+        embeddings = self.projection_layer(embeddings)
         return embeddings
 
-    def apply_pca_and_cache(self):
-        embeddings = np.vstack([embedding for embedding in self.original_embeddings_cache.values()])
-        pca = PCA(n_components=self.dim)
-        reduced_embeddings = pca.fit_transform(embeddings)
+    def compute_embeddings(self, texts: list, device: torch.device) -> torch.Tensor:
+        embeddings = []
+        for text in tqdm(texts, desc="Computing LM embeddings"):
+            inputs = self.tokenizer(text, return_tensors='pt',
+                                    truncation=True,
+                                    padding=True,
+                                    max_length=self.lm_max_length).to(device)
+            outputs = self.lm_model(**inputs)
+            cls_embedding = outputs.last_hidden_state[:, 0, :].detach().cpu().numpy()
+            embeddings.append(cls_embedding)
 
-        for text, embedding in zip(self.original_embeddings_cache.keys(), reduced_embeddings):
-            self.pca_embeddings_cache[text] = torch.tensor(embedding, dtype=torch.float32)
-
-        self.save_cache(self.pca_embeddings_cache, self.pca_embeddings_cache_path)
-
-    def compute_embeddings(self, texts: list, device: torch.device) -> None:
-        new_texts = [text for text in texts if text not in self.original_embeddings_cache]
-        if new_texts:
-            embeddings = []
-            for text in tqdm(new_texts, desc="Computing LM embeddings"):
-                inputs = self.tokenizer(text, return_tensors='pt', truncation=True,
-                                        padding=True, max_length=self.lm_max_length).to(device)
-                outputs = self.lm_model(**inputs)
-                cls_embedding = outputs.last_hidden_state[:, 0, :].detach().cpu().numpy()
-                embeddings.append(cls_embedding)
-
-            embeddings = np.vstack(embeddings)
-            for text, embedding in zip(new_texts, embeddings):
-                self.original_embeddings_cache[text] = embedding
-
-            self.save_cache(self.original_embeddings_cache, self.original_embeddings_cache_path)
-
-        if len(self.original_embeddings_cache) > 0 and len(self.pca_embeddings_cache) == 0:
-            self.apply_pca_and_cache()
+        embeddings = np.vstack(embeddings)
+        return torch.tensor(embeddings, dtype=torch.float32).to(device)
 
 
 class MLP(nn.Module):
