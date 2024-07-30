@@ -113,10 +113,8 @@ class CatTransformer(nn.Module):
         device = x_categ.device
         self.categories_offset = self.categories_offset.to(device)
 
-        assert x_categ.shape[
-                   1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
-        assert x_cont.shape[
-                   1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
+        assert x_categ.shape[1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
+        assert x_cont.shape[1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
 
         x_categ = self.handle_missing_data(x_categ)
 
@@ -129,19 +127,25 @@ class CatTransformer(nn.Module):
                     categ_embed.shape[0], 1, 1)
                 shared_categ_embed = shared_categ_embed.to(device)
                 categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
+            # only process high-cardinality features if they are present
+            if self.num_high_card_categories > 0:
+                lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
+                lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1,
+                                               self.dim)  # reshape to match batch size
+                categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
 
-        # Convert list to tensor if high cardinality features are present
-        if self.use_lm_embeddings and self.num_high_card_categories > 0 and x_high_card_categ:
-            # Ensure x_high_card_categ is a tensor
-            if isinstance(x_high_card_categ, list):
-                x_high_card_categ = [torch.tensor(hc, dtype=torch.long, device=device)
-                                     for hc in x_high_card_categ]
-                x_high_card_categ = torch.stack(x_high_card_categ)
-
-            lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
-            lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1,
-                                           self.dim)  # reshape to match batch size
-            categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
+        # # convert list to tensor if high cardinality features are present
+        # if self.use_lm_embeddings and self.num_high_card_categories > 0 and x_high_card_categ:
+        #     # ensure x_high_card_categ is a tensor
+        #     if isinstance(x_high_card_categ, list):
+        #         x_high_card_categ = [torch.tensor(hc, dtype=torch.long, device=device)
+        #                              for hc in x_high_card_categ]
+        #         x_high_card_categ = torch.stack(x_high_card_categ)
+        #
+        #     lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
+        #     lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1,
+        #                                    self.dim)  # reshape to match batch size
+        #     categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
 
         x = self.transformer(categ_embed)
         flat_categ = x.flatten(start_dim=1)
