@@ -109,7 +109,7 @@ class CatTransformer(nn.Module):
             self.embeddings_cache = self.load_embeddings_cache()
 
     def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor,
-                x_high_card_categ: torch.Tensor) -> torch.Tensor:
+                x_high_card_categ: Optional[List[str]]) -> torch.Tensor:
         device = x_categ.device
         self.categories_offset = self.categories_offset.to(device)
 
@@ -310,7 +310,7 @@ class CatTransformerDataset(Dataset):
     def __len__(self) -> int:
         return len(self.categorical_data)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, Optional[List[str]], torch.Tensor]:
         """
         Retrieves a single sample from the dataset.
 
@@ -325,14 +325,72 @@ class CatTransformerDataset(Dataset):
         """
         if self.high_card_features:
             high_card_sample = self.high_card_data.iloc[idx].tolist()
-            high_card_sample = torch.tensor(high_card_sample, dtype=torch.long)  # convert to tensor
+            return (self.categorical_data[idx],
+                    self.continuous_data[idx],
+                    high_card_sample,
+                    self.target_data[idx])
         else:
-            high_card_sample = torch.tensor([], dtype=torch.long)  # empty tensor if not present
+            return (self.categorical_data[idx],
+                    self.continuous_data[idx],
+                    [],
+                    self.target_data[idx])
 
-        return (self.categorical_data[idx],
-                self.continuous_data[idx],
-                high_card_sample,
-                self.target_data[idx])
+
+# class CatTransformerDataset(Dataset):
+#     def __init__(self,
+#                  df: pd.DataFrame,
+#                  categorical_features: List[str],
+#                  continuous_features: List[str],
+#                  pred_vars: List[str],
+#                  high_card_features: Optional[List[str]] = []) -> None:
+#         """
+#         Initializes the CatTransformerDataset.
+#
+#         Args:
+#             df: The input DataFrame containing all the data.
+#             categorical_features: List of column names for categorical features.
+#             continuous_features: List of column names for continuous features.
+#             pred_vars: List of column names for prediction target variables.
+#             high_card_features: List of column names for high cardinality features.
+#
+#         Returns:
+#             None
+#         """
+#         self.categorical_data = torch.tensor(df[categorical_features].values, dtype=torch.long)
+#         self.continuous_data = torch.tensor(df[continuous_features].values, dtype=torch.float)
+#         self.target_data = torch.tensor(df[pred_vars].values, dtype=torch.float)
+#         self.high_card_features = high_card_features
+#
+#         if high_card_features:
+#             self.high_card_data = df[high_card_features].reset_index(drop=True)
+#
+#     def __len__(self) -> int:
+#         return len(self.categorical_data)
+#
+#     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+#         """
+#         Retrieves a single sample from the dataset.
+#
+#         Args:
+#             idx: The index of the sample to retrieve.
+#         Returns:
+#             A tuple of:
+#                 - Categorical data tensor
+#                 - Continuous data tensor
+#                 - List of high cardinality feature values (if present)
+#                 - Target data tensor
+#         """
+#         if self.high_card_features:
+#             high_card_sample = self.high_card_data.iloc[idx].tolist()
+#             high_card_sample = torch.tensor(high_card_sample, dtype=torch.long)  # convert to tensor
+#         else:
+#             high_card_sample = torch.tensor([], dtype=torch.long)  # empty tensor if not present
+#
+#         return (self.categorical_data[idx],
+#                 self.continuous_data[idx],
+#                 high_card_sample,
+#                 self.target_data[idx])
+
 
 def count_parameters(model):
     embedding_params = 0
