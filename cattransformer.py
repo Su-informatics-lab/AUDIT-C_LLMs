@@ -49,7 +49,8 @@ class CatTransformer(nn.Module):
             shared_categ_dim_divisor: int = 8,  # 1/8 of cat_embedding dims are shared in CatTransformer
             lm_model_name: str = 'distilbert/distilbert-base-uncased',  # Hugging Face BERT variant model name, and we recommend `Su-informatics-lab/gatortron_base_rxnorm_babbage_v2`
             lm_max_length: int = 512,  # max tokens for LM embedding computation
-            embeddings_cache_path: str = '.lm_embeddings.pkl'  # path to cache embeddings
+            original_embeddings_cache_path: str = '.lm_embeddings.pkl',  # path to cache original embeddings
+            pca_embeddings_cache_path: str = '.pca_lm_embeddings.pkl'  # path to cache PCA-transformed embeddings
     ) -> None:
         super().__init__()
         assert all(map(lambda n: n > 0,
@@ -105,8 +106,12 @@ class CatTransformer(nn.Module):
 
         if self.use_lm_embeddings:
             self.lm_model, self.tokenizer = self.load_lm_model(lm_model_name)
-            self.embeddings_cache_path = embeddings_cache_path
-            self.embeddings_cache = self.load_embeddings_cache()
+            self.original_embeddings_cache_path = original_embeddings_cache_path
+            self.pca_embeddings_cache_path = pca_embeddings_cache_path
+            self.original_embeddings_cache = self.load_cache(self.original_embeddings_cache_path)
+            self.pca_embeddings_cache = self.load_cache(self.pca_embeddings_cache_path)
+            if len(self.original_embeddings_cache) > 0 and len(self.pca_embeddings_cache) == 0:
+                self.apply_pca_and_cache()
 
     def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor,
                 x_high_card_categ: Optional[List[str]]) -> torch.Tensor:
@@ -128,24 +133,11 @@ class CatTransformer(nn.Module):
                 shared_categ_embed = shared_categ_embed.to(device)
                 categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
             # only process high-cardinality features if they are present
-            if self.num_high_card_categories > 0:
+            if self.num_high_card_categories > 0 and len(x_high_card_categ) > 0:
                 lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
                 lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1,
                                                self.dim)  # reshape to match batch size
                 categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
-
-        # # convert list to tensor if high cardinality features are present
-        # if self.use_lm_embeddings and self.num_high_card_categories > 0 and x_high_card_categ:
-        #     # ensure x_high_card_categ is a tensor
-        #     if isinstance(x_high_card_categ, list):
-        #         x_high_card_categ = [torch.tensor(hc, dtype=torch.long, device=device)
-        #                              for hc in x_high_card_categ]
-        #         x_high_card_categ = torch.stack(x_high_card_categ)
-        #
-        #     lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
-        #     lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1,
-        #                                    self.dim)  # reshape to match batch size
-        #     categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
 
         x = self.transformer(categ_embed)
         flat_categ = x.flatten(start_dim=1)
@@ -164,52 +156,6 @@ class CatTransformer(nn.Module):
 
         return logits
 
-    # def forward(self, x_categ: torch.Tensor, x_cont: torch.Tensor,
-    #             x_high_card_categ: Optional[List[str]]) -> torch.Tensor:
-    #     device = x_categ.device
-    #     self.categories_offset = self.categories_offset.to(device)
-    #
-    #     assert x_categ.shape[
-    #                1] == self.num_categories, f'You must pass in {self.num_categories} values for your categories input'
-    #     assert x_cont.shape[
-    #                1] == self.num_continuous, f'You must pass in {self.num_continuous} values for your continuous input'
-    #
-    #     x_categ = self.handle_missing_data(x_categ)
-    #
-    #     if self.num_unique_categories > 0:
-    #         x_categ = x_categ + self.categories_offset
-    #         categ_embed = self.category_embed(x_categ)
-    #
-    #         if self.use_shared_categ_embed:
-    #             shared_categ_embed = self.shared_category_embed.unsqueeze(0).repeat(
-    #                 categ_embed.shape[0], 1, 1)
-    #             shared_categ_embed = shared_categ_embed.to(device)
-    #             categ_embed = torch.cat((categ_embed, shared_categ_embed), dim=-1)
-    #
-    #     # only process high-cardinality features if they are present
-    #     if self.num_high_card_categories > 0 and x_high_card_categ.size(1) > 0:
-    #         lm_cat_proj = self.get_lm_embeddings(x_high_card_categ, device)
-    #         lm_cat_proj = lm_cat_proj.view(x_categ.size(0), -1,
-    #                                        self.dim)  # reshape to match batch size
-    #         categ_embed = torch.cat((categ_embed, lm_cat_proj), dim=1)
-    #
-    #     x = self.transformer(categ_embed)
-    #     flat_categ = x.flatten(start_dim=1)
-    #
-    #     if self.num_continuous > 0:
-    #         if self.continuous_mean_std is not None:
-    #             mean, std = self.continuous_mean_std.unbind(dim=-1)
-    #             x_cont = (x_cont - mean) / std
-    #
-    #         normed_cont = self.cont_norm(x_cont)
-    #         x = torch.cat((flat_categ, normed_cont), dim=1)
-    #     else:
-    #         x = flat_categ
-    #
-    #     logits = self.mlp(x)
-    #
-    #     return logits
-
     def handle_missing_data(self, x_categ: torch.Tensor) -> torch.Tensor:
         missing_data_mask = (x_categ == 'na') | (x_categ == 'missing') | (
                 x_categ == np.nan) | (x_categ == 'NaN') | (x_categ == 'N/A')
@@ -221,57 +167,55 @@ class CatTransformer(nn.Module):
         tokenizer = AutoTokenizer.from_pretrained(lm_model_name)
         return model, tokenizer
 
-    def load_embeddings_cache(self):
-        if os.path.exists(self.embeddings_cache_path):
-            with open(self.embeddings_cache_path, 'rb') as f:
+    def load_cache(self, cache_path):
+        if os.path.exists(cache_path):
+            with open(cache_path, 'rb') as f:
                 return pickle.load(f)
         return {}
 
-    def save_embeddings_cache(self) -> None:
-        with open(self.embeddings_cache_path, 'wb') as f:
-            pickle.dump(self.embeddings_cache, f)
+    def save_cache(self, cache, cache_path) -> None:
+        with open(cache_path, 'wb') as f:
+            pickle.dump(cache, f)
 
     def get_lm_embeddings(self, x_high_card_categ: list,
                           device: torch.device) -> torch.Tensor:
-        new_texts = []
-        # print(f'***{len(x_high_card_categ)=}***')
-        # print(f'***{len(x_high_card_categ[0])=}***')
-        for texts in x_high_card_categ:
-            for text in texts:
-                if text not in self.embeddings_cache:
-                    new_texts.append(text)
-
-        if new_texts:
-            new_embeddings = self.compute_embeddings(new_texts, device)
-            for text, embedding in zip(new_texts, new_embeddings):
-                self.embeddings_cache[text] = embedding
-
-            self.save_embeddings_cache()
-
         embeddings = []
         for texts in x_high_card_categ:
-            embedding_list = [self.embeddings_cache[text].cpu() for text in texts]
+            embedding_list = [self.pca_embeddings_cache[text].cpu() for text in texts]
             embeddings.append(np.stack(embedding_list, axis=0))
         embeddings = np.stack(embeddings, axis=0)
         embeddings = torch.tensor(embeddings, dtype=torch.float32).to(device)
-        # print(f'***output: {embeddings.shape=}***')
         return embeddings
 
-    def compute_embeddings(self, texts: list, device: torch.device) -> torch.Tensor:
-        embeddings = []
-        for text in tqdm(texts, desc="Computing LM embeddings"):
-            inputs = self.tokenizer(text, return_tensors='pt', truncation=True,
-                                    padding=True, max_length=self.lm_max_length).to(
-                device)
-            outputs = self.lm_model(**inputs)
-            cls_embedding = outputs.last_hidden_state[:, 0, :].detach().cpu().numpy()
-            embeddings.append(cls_embedding)
-
-        embeddings = np.vstack(embeddings)
+    def apply_pca_and_cache(self):
+        embeddings = np.vstack([embedding for embedding in self.original_embeddings_cache.values()])
         pca = PCA(n_components=self.dim)
         reduced_embeddings = pca.fit_transform(embeddings)
 
-        return torch.tensor(reduced_embeddings, dtype=torch.float32).to(device)
+        for text, embedding in zip(self.original_embeddings_cache.keys(), reduced_embeddings):
+            self.pca_embeddings_cache[text] = torch.tensor(embedding, dtype=torch.float32)
+
+        self.save_cache(self.pca_embeddings_cache, self.pca_embeddings_cache_path)
+
+    def compute_embeddings(self, texts: list, device: torch.device) -> None:
+        new_texts = [text for text in texts if text not in self.original_embeddings_cache]
+        if new_texts:
+            embeddings = []
+            for text in tqdm(new_texts, desc="Computing LM embeddings"):
+                inputs = self.tokenizer(text, return_tensors='pt', truncation=True,
+                                        padding=True, max_length=self.lm_max_length).to(device)
+                outputs = self.lm_model(**inputs)
+                cls_embedding = outputs.last_hidden_state[:, 0, :].detach().cpu().numpy()
+                embeddings.append(cls_embedding)
+
+            embeddings = np.vstack(embeddings)
+            for text, embedding in zip(new_texts, embeddings):
+                self.original_embeddings_cache[text] = embedding
+
+            self.save_cache(self.original_embeddings_cache, self.original_embeddings_cache_path)
+
+        if len(self.original_embeddings_cache) > 0 and len(self.pca_embeddings_cache) == 0:
+            self.apply_pca_and_cache()
 
 
 class MLP(nn.Module):
@@ -343,62 +287,6 @@ class CatTransformerDataset(Dataset):
                     self.continuous_data[idx],
                     [],
                     self.target_data[idx])
-
-
-# class CatTransformerDataset(Dataset):
-#     def __init__(self,
-#                  df: pd.DataFrame,
-#                  categorical_features: List[str],
-#                  continuous_features: List[str],
-#                  pred_vars: List[str],
-#                  high_card_features: Optional[List[str]] = []) -> None:
-#         """
-#         Initializes the CatTransformerDataset.
-#
-#         Args:
-#             df: The input DataFrame containing all the data.
-#             categorical_features: List of column names for categorical features.
-#             continuous_features: List of column names for continuous features.
-#             pred_vars: List of column names for prediction target variables.
-#             high_card_features: List of column names for high cardinality features.
-#
-#         Returns:
-#             None
-#         """
-#         self.categorical_data = torch.tensor(df[categorical_features].values, dtype=torch.long)
-#         self.continuous_data = torch.tensor(df[continuous_features].values, dtype=torch.float)
-#         self.target_data = torch.tensor(df[pred_vars].values, dtype=torch.float)
-#         self.high_card_features = high_card_features
-#
-#         if high_card_features:
-#             self.high_card_data = df[high_card_features].reset_index(drop=True)
-#
-#     def __len__(self) -> int:
-#         return len(self.categorical_data)
-#
-#     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-#         """
-#         Retrieves a single sample from the dataset.
-#
-#         Args:
-#             idx: The index of the sample to retrieve.
-#         Returns:
-#             A tuple of:
-#                 - Categorical data tensor
-#                 - Continuous data tensor
-#                 - List of high cardinality feature values (if present)
-#                 - Target data tensor
-#         """
-#         if self.high_card_features:
-#             high_card_sample = self.high_card_data.iloc[idx].tolist()
-#             high_card_sample = torch.tensor(high_card_sample, dtype=torch.long)  # convert to tensor
-#         else:
-#             high_card_sample = torch.tensor([], dtype=torch.long)  # empty tensor if not present
-#
-#         return (self.categorical_data[idx],
-#                 self.continuous_data[idx],
-#                 high_card_sample,
-#                 self.target_data[idx])
 
 
 def count_parameters(model):
