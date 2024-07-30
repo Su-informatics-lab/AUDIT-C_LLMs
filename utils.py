@@ -1,4 +1,4 @@
-import pandas as pd
+import torch.nn as nn
 import numpy as np
 from lifelines.utils import concordance_index
 from sklearn.metrics import mean_squared_error
@@ -18,6 +18,16 @@ HEAD = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C
         "from 0 to 12 based on the provided demographics and comorbidity data:\n")
 TAIL = "\n### AUDIT-C Score:"
 
+
+def count_parameters(model: nn.Module) -> int:
+    """
+    Count the number of parameters in a model.
+    Args:
+        model (nn.Module): The model for which to count parameters.
+    Returns:
+        int: The total number of parameters in the model.
+    """
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 def period_separated_narrative_formatting(a_row):
     """

@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader, RandomSampler
 
 from cattransformer import CatTransformer, CatTransformerDataset
 from utils import (DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH,
-                   PROJECT_NAME, SEED, compute_metrics)
+                   PROJECT_NAME, SEED, compute_metrics, count_parameters)
 
 torch.manual_seed(SEED)
 
@@ -160,6 +160,10 @@ if __name__ == "__main__":
         embeddings_cache_path='.lm_embeddings.pkl'  # path to cache embeddings
     ).to(device)
 
+    # print the total number of parameters in the model
+    total_params = count_parameters(model)
+    print(f"Total number of parameters in the model: {total_params}")
+
     # training settings
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
@@ -237,6 +241,10 @@ if __name__ == "__main__":
                     if early_stopping_counter >= early_stopping_steps:
                         print(f"Early stopping at epoch {epoch + 1}")
                         break
+
+        if early_stopping_counter >= early_stopping_steps:
+            print(f"Early stopping at epoch {epoch + 1}")
+            break
 
     # test the best model
     best_model_path = top_models[0][1]
