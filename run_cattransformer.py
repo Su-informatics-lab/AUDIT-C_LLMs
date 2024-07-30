@@ -12,7 +12,8 @@ from torch import optim
 from torch.utils.data import DataLoader, RandomSampler
 
 from cattransformer import CatTransformer, CatTransformerDataset
-from utils import PROJECT_NAME, SEED, compute_metrics
+from utils import (PROJECT_NAME, SEED, compute_metrics,
+                   DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH)
 
 torch.manual_seed(SEED)
 
@@ -30,10 +31,10 @@ def save_model(model, eval_loss, top_models, run_name):
     return top_models
 
 
-def prepare_standard_concept_name(df, prefix="Drugs used in the past half year may or may not reflect one's drinking behavior: "):
+def prepare_standard_concept_name(df, prefix="Recent drug: "):
     column_name = 'standard_concept_name'
     df[column_name] = df[column_name].str.replace(" | ", ", ", regex=False)
-    df[column_name] = df[column_name].fillna("No drug used in the past half year.")
+    df[column_name] = df[column_name].fillna("None")
     df[column_name] = prefix + df[column_name]
     return df
 
@@ -54,18 +55,25 @@ if __name__ == "__main__":
     parser.add_argument("--num_epochs", type=int, default=1000)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--eval_interval", type=int, default=1000)
-    parser.add_argument("--patience", type=int, default=1000,
+    parser.add_argument("--patience", type=int, default=50,
                         help='early stopping patience')
+    parser.add_argument(
+        "--remove_zero_score",
+        action='store_true',
+        default=False,
+        help="whether to filter out those w/ zero AUDIT-C score"
+    )
+    parser.add_argument(
+        "--run_name",
+        help="like 'CatTransformer_demo_como_halfYearDrug'"
+    )
     args = parser.parse_args()
 
-    run_name = "CatTransformer_demoComo_drug" if args.with_drug_string else "CatTransformer_demoComo"
-    try:
-        wandb.init(project=PROJECT_NAME, name=run_name)
-    except wandb.errors.CommError:
-        print("WandB communication error, proceeding without logging.")
+    wandb.init(project=PROJECT_NAME, name=args.run_name)
 
-    DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_DEMO_ExpComo_PipeSep_HalfYearDrug_212K.parquet'
     df = pd.read_parquet(DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH)
+    if args.remove_zero_score:
+        df = df.loc[df['audit.c.score'] > 0]  # 170375 rows × 29 columns
     df = prepare_standard_concept_name(df)
 
     df['gender'] = encode_categorical_with_reference(df, 'gender', 'Man')
