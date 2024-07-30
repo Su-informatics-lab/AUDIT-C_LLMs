@@ -12,8 +12,8 @@ from torch import optim
 from torch.utils.data import DataLoader, RandomSampler
 
 from cattransformer import CatTransformer, CatTransformerDataset
-from utils import (PROJECT_NAME, SEED, compute_metrics,
-                   DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH)
+from utils import (DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH,
+                   PROJECT_NAME, SEED, compute_metrics)
 
 torch.manual_seed(SEED)
 
@@ -231,7 +231,7 @@ if __name__ == "__main__":
                 if eval_loss < best_eval_loss:
                     best_eval_loss = eval_loss
                     early_stopping_counter = 0
-                    top_models = save_model(model, eval_loss, top_models, run_name)
+                    top_models = save_model(model, eval_loss, top_models, args.run_name)
                 else:
                     early_stopping_counter += 1
                     if early_stopping_counter >= early_stopping_steps:
