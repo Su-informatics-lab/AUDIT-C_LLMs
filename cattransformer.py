@@ -143,6 +143,20 @@ class CatTransformer(nn.Module):
 
         return logits
 
+    def precompute_embeddings(self, all_high_card_texts: List[str],
+                              device: torch.device):
+        new_texts = [text for text in all_high_card_texts if
+                     text not in self.embeddings_cache]
+
+        if new_texts:
+            print(f"Precomputing embeddings for {len(new_texts)} new texts")
+            new_embeddings = self.compute_embeddings(new_texts, device)
+            for text, embedding in zip(new_texts, new_embeddings):
+                self.embeddings_cache[text] = embedding.cpu()
+            self.save_embeddings_cache()
+        else:
+            print("All embeddings already in cache")
+
     def handle_missing_data(self, x_categ: torch.Tensor) -> torch.Tensor:
         missing_data_mask = ((x_categ == 'na') | (x_categ == 'missing') |
                              (x_categ == np.nan) | (x_categ == 'NaN') |
@@ -169,18 +183,6 @@ class CatTransformer(nn.Module):
 
     def get_lm_embeddings(self, x_high_card_categ: list,
                           device: torch.device) -> torch.Tensor:
-        all_texts = set([text for texts in x_high_card_categ for text in texts])
-        new_texts = [text for text in all_texts if text not in self.embeddings_cache]
-
-        if new_texts:
-            print(f"Computing embeddings for {len(new_texts)} new texts")
-            new_embeddings = self.compute_embeddings(new_texts, device)
-            for text, embedding in zip(new_texts, new_embeddings):
-                self.embeddings_cache[text] = embedding.cpu()
-            self.save_embeddings_cache()
-        else:
-            print("All embeddings found in cache")
-
         embeddings = []
         for texts in x_high_card_categ:
             embedding_list = [self.embeddings_cache[text].to(device) for text in texts]
@@ -188,6 +190,27 @@ class CatTransformer(nn.Module):
 
         embeddings = torch.stack(embeddings, dim=0)
         return self.projection_layer(embeddings)
+    # def get_lm_embeddings(self, x_high_card_categ: list,
+    #                       device: torch.device) -> torch.Tensor:
+    #     all_texts = set([text for texts in x_high_card_categ for text in texts])
+    #     new_texts = [text for text in all_texts if text not in self.embeddings_cache]
+    #
+    #     if new_texts:
+    #         print(f"Computing embeddings for {len(new_texts)} new texts")
+    #         new_embeddings = self.compute_embeddings(new_texts, device)
+    #         for text, embedding in zip(new_texts, new_embeddings):
+    #             self.embeddings_cache[text] = embedding.cpu()
+    #         self.save_embeddings_cache()
+    #     else:
+    #         print("All embeddings found in cache")
+    #
+    #     embeddings = []
+    #     for texts in x_high_card_categ:
+    #         embedding_list = [self.embeddings_cache[text].to(device) for text in texts]
+    #         embeddings.append(torch.stack(embedding_list, dim=0))
+    #
+    #     embeddings = torch.stack(embeddings, dim=0)
+    #     return self.projection_layer(embeddings)
     # def get_lm_embeddings(self, x_high_card_categ: list,
     #                       device: torch.device) -> torch.Tensor:
     #     new_texts = []
