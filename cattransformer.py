@@ -167,9 +167,36 @@ class CatTransformer(nn.Module):
         with open(self.embeddings_cache_path, 'wb') as f:
             pickle.dump(self.embeddings_cache, f)
 
+    # def get_lm_embeddings(self, x_high_card_categ: list,
+    #                       device: torch.device) -> torch.Tensor:
+    #     #
+    #     new_texts = []
+    #     for texts in x_high_card_categ:
+    #         for text in texts:
+    #             if text not in self.embeddings_cache.values():
+    #                 new_texts.append(text)
+    #
+    #     if new_texts:
+    #         new_embeddings = self.compute_embeddings(new_texts, device)
+    #         for text, embedding in zip(new_texts, new_embeddings):
+    #             self.embeddings_cache[text] = embedding
+    #
+    #         self.save_embeddings_cache()
+    #
+    #     embeddings = []
+    #     for texts in x_high_card_categ:
+    #         embedding_list = []
+    #         for text in texts:
+    #             embedding_list.append(self.embeddings_cache[text].cpu())
+    #         embeddings.append(np.stack(embedding_list, axis=0))
+    #
+    #     embeddings = np.stack(embeddings, axis=0)
+    #     embeddings = torch.tensor(embeddings, dtype=torch.float32).to(device)
+    #     embeddings = self.projection_layer(embeddings)
+    #
+    #     return embeddings
     def get_lm_embeddings(self, x_high_card_categ: list,
                           device: torch.device) -> torch.Tensor:
-        #
         new_texts = []
         for texts in x_high_card_categ:
             for text in texts:
@@ -179,7 +206,7 @@ class CatTransformer(nn.Module):
         if new_texts:
             new_embeddings = self.compute_embeddings(new_texts, device)
             for text, embedding in zip(new_texts, new_embeddings):
-                self.embeddings_cache[text] = embedding
+                self.embeddings_cache[text] = embedding.cpu()  # store embeddings on RAM
 
             self.save_embeddings_cache()
 
