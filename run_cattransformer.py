@@ -167,6 +167,9 @@ if __name__ == "__main__":
     print(f"MLP Parameters: {param_counts['mlp_params']}")
     print(f"Total Parameters: {param_counts['total_params']}")
 
+    if args.with_drug:
+        all_high_card_texts = set(df[high_card_features].values.flatten())
+        model.precompute_embeddings(list(all_high_card_texts), device)
     # training settings
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
