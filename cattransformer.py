@@ -167,19 +167,39 @@ class CatTransformer(nn.Module):
         with open(self.embeddings_cache_path, 'wb') as f:
             pickle.dump(self.embeddings_cache, f)
 
+    def get_lm_embeddings(self, x_high_card_categ: list,
+                          device: torch.device) -> torch.Tensor:
+        all_texts = set([text for texts in x_high_card_categ for text in texts])
+        new_texts = [text for text in all_texts if text not in self.embeddings_cache]
+
+        if new_texts:
+            print(f"Computing embeddings for {len(new_texts)} new texts")
+            new_embeddings = self.compute_embeddings(new_texts, device)
+            for text, embedding in zip(new_texts, new_embeddings):
+                self.embeddings_cache[text] = embedding.cpu()
+            self.save_embeddings_cache()
+        else:
+            print("All embeddings found in cache")
+
+        embeddings = []
+        for texts in x_high_card_categ:
+            embedding_list = [self.embeddings_cache[text].to(device) for text in texts]
+            embeddings.append(torch.stack(embedding_list, dim=0))
+
+        embeddings = torch.stack(embeddings, dim=0)
+        return self.projection_layer(embeddings)
     # def get_lm_embeddings(self, x_high_card_categ: list,
     #                       device: torch.device) -> torch.Tensor:
-    #     #
     #     new_texts = []
     #     for texts in x_high_card_categ:
     #         for text in texts:
-    #             if text not in self.embeddings_cache.values():
+    #             if text not in self.embeddings_cache:
     #                 new_texts.append(text)
     #
     #     if new_texts:
     #         new_embeddings = self.compute_embeddings(new_texts, device)
     #         for text, embedding in zip(new_texts, new_embeddings):
-    #             self.embeddings_cache[text] = embedding
+    #             self.embeddings_cache[text] = embedding.cpu()  # store embeddings on RAM
     #
     #         self.save_embeddings_cache()
     #
@@ -195,33 +215,6 @@ class CatTransformer(nn.Module):
     #     embeddings = self.projection_layer(embeddings)
     #
     #     return embeddings
-    def get_lm_embeddings(self, x_high_card_categ: list,
-                          device: torch.device) -> torch.Tensor:
-        new_texts = []
-        for texts in x_high_card_categ:
-            for text in texts:
-                if text not in self.embeddings_cache:
-                    new_texts.append(text)
-
-        if new_texts:
-            new_embeddings = self.compute_embeddings(new_texts, device)
-            for text, embedding in zip(new_texts, new_embeddings):
-                self.embeddings_cache[text] = embedding.cpu()  # store embeddings on RAM
-
-            self.save_embeddings_cache()
-
-        embeddings = []
-        for texts in x_high_card_categ:
-            embedding_list = []
-            for text in texts:
-                embedding_list.append(self.embeddings_cache[text].cpu())
-            embeddings.append(np.stack(embedding_list, axis=0))
-
-        embeddings = np.stack(embeddings, axis=0)
-        embeddings = torch.tensor(embeddings, dtype=torch.float32).to(device)
-        embeddings = self.projection_layer(embeddings)
-
-        return embeddings
 
     def compute_embeddings(self, texts: list, device: torch.device) -> torch.Tensor:
         embeddings = []
