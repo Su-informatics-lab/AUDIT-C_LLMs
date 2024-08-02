@@ -43,13 +43,52 @@ def encode_categorical_with_reference(df, column, reference):
     categories = [reference] + [x for x in df[column].unique() if x != reference]
     return pd.Categorical(df[column], categories=categories).codes
 
+severity_mappings = {
+    'fatigue': {
+        'Average Fatigue 7 Days: None': 0,
+        'Average Fatigue 7 Days: Mild': 1,
+        'Average Fatigue 7 Days: Moderate': 2,
+        'Average Fatigue 7 Days: Severe': 3,
+        'Average Fatigue 7 Days: Very Severe': 4,
+    },
+    'anxiety': {
+        'Emotional Problem 7 Days: Never': 0,
+        'Emotional Problem 7 Days: Rarely': 1,
+        'Emotional Problem 7 Days: Sometimes': 2,
+        'Emotional Problem 7 Days: Often': 3,
+        'Emotional Problem 7 Days: Always': 4,
+    }
+}
+
+def encode_severity(df, column_name, mapping):
+    """
+    Encode severity levels in a DataFrame column using a specified mapping.
+
+    Parameters:
+    - df: pandas DataFrame
+    - column_name: str, name of the column to encode
+    - mapping: dict, mapping from severity levels to integers
+
+    Returns:
+    - pandas Series with encoded severity levels
+    """
+    return df[column_name].map(mapping)
+
+
+def prepare_data_with_encoding(df):
+    df_encoded = df.copy()
+    df_encoded['gender'] = encode_categorical_with_reference(df_encoded, 'gender', 'Man')
+    df_encoded['race'] = encode_categorical_with_reference(df_encoded, 'race', 'White')
+    df_encoded['ethnicity'] = encode_categorical_with_reference(df_encoded, 'ethnicity', 'Others')
+    return df_encoded
+
 
 if __name__ == "__main__":
     torch.manual_seed(SEED)
     parser = argparse.ArgumentParser(
         description="Train a CatTransformer for predictions on Fatigue or Anxiety"
     )
-    parser.add_argument("--task", type=str, choices=['fatigue', 'anxiety'])
+    parser.add_argument("--target", type=str, choices=['fatigue', 'anxiety'])
     parser.add_argument("--with_drug", action='store_true', default=False,
                         help="if use drug data; set to False will only use demo + como (as a TabTransformer)")
     parser.add_argument("--learning_rate", type=float, default=1e-5)
@@ -68,12 +107,17 @@ if __name__ == "__main__":
 
     df = pd.read_parquet(
         DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_FAT_ANX_AUD_212K_RAW_PARQUET_PATH)
-    df = prepare_standard_concept_name(df)
+    # filter out nas
+    df = df[df[args.target] != 'PMI: Skip']
+    # encode target
+    df[args.target] = encode_severity(df, args.target, severity_mappings[args.target])
+    # encde features with proper reference
+    df = prepare_data_with_encoding(df)
+    # prepare drugs
+    if args.with_drug:
+        df = prepare_standard_concept_name(df)
 
-    df['gender'] = encode_categorical_with_reference(df, 'gender', 'Man')
-    df['race'] = encode_categorical_with_reference(df, 'race', 'White')
-    df['ethnicity'] = encode_categorical_with_reference(df, 'ethnicity', 'Others')
-
+    # prepare inputs to cat
     categorical_features = [
         "Metastatic_Solid_Tumor",
         "Dementia",
@@ -99,7 +143,7 @@ if __name__ == "__main__":
     ]
 
     continuous_features = ["age"]
-    pred_vars = [args.task]
+    pred_vars = [args.target]
     all_cols = categorical_features + continuous_features + pred_vars
 
     if args.with_drug:
