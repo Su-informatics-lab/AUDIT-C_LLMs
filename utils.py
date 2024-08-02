@@ -8,8 +8,10 @@ CSV_THREE_DRUG_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/
 DEMO_COMO_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_CX_04052024.parquet'
 DEMO_COMO_THREE_DRUG_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_DEMO_COMO_THREE_DRUG_05032024.parquet'
 DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_DEMO_ExpComo_PipeSep_HalfYearDrug_212K.parquet'
+FATIGUE_ANXIETY = "gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/bq_exports/xiongc@researchallofus.org/20240801/survey_27943846/survey_27943846_*.csv"
+DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_FAT_ANX_AUD_212K_RAW_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_DEMO_ExpComo_PipeSep_HalfYearDrug_fatigue_anxiety_auditc_212K.parquet'
 MODEL_NAME = 'google/flan-t5-base'
-PROJECT_NAME = 'AUDIT-C_LLMs_NO_ZERO'
+PROJECT_NAME = 'ALLOFUS'
 SEED = 6179
 
 MAX_LENGTH = 256
