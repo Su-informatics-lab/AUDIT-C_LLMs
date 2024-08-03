@@ -146,11 +146,13 @@ def preprocess_df_for_lm(df):
 if __name__ == "__main__":
     torch.manual_seed(SEED + 123565)
     parser = argparse.ArgumentParser(description="Train a GatorTron regression model for fatigue or anxiety prediction")
+    parser.add_argument("--target", type=str, choices=['fatigue', 'anxiety'])
+    parser.add_argument("--with_drug", action='store_true', default=False,
+                        help="if use drug data; set to False will only use demo + como")
     parser.add_argument("--non_linear_head", action='store_true', default=False, help="whether to use non-linear regression head")
     parser.add_argument("--model_name", default=MODEL_NAME, help="which model to use")
     parser.add_argument("--run_name", help="like 'gatortron_demo_como_drug'")
-    parser.add_argument("--with_drug", action='store_true', default=False,
-                        help="if use drug data; set to False will only use demo + como")
+
     args = parser.parse_args()
 
     wandb.init(project=PROJECT_NAME, name=args.run_name)
