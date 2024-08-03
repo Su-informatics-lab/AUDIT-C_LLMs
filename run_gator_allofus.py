@@ -150,6 +150,7 @@ if __name__ == "__main__":
     parser.add_argument("--with_drug", action='store_true', default=False,
                         help="if use drug data; set to False will only use demo + como")
     parser.add_argument("--non_linear_head", action='store_true', default=False, help="whether to use non-linear regression head")
+    parser.add_argument("--learning_rate", type=float, default=1e-5)
     parser.add_argument("--model_name", default=MODEL_NAME, help="which model to use")
     parser.add_argument("--run_name", help="like 'gatortron_demo_como_drug'")
 
@@ -185,10 +186,10 @@ if __name__ == "__main__":
         do_train=True,
         do_eval=True,
         do_predict=True,
-        evaluation_strategy="steps",
+        eval_strategy="steps",
         auto_find_batch_size=True,
         gradient_accumulation_steps=4,
-        learning_rate=3e-4,
+        learning_rate=args.learning_rate,
         weight_decay=1e-1,
         logging_steps=50,
         eval_steps=100,
