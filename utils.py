@@ -31,13 +31,14 @@ def count_parameters(model: nn.Module) -> int:
     """
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-def period_separated_narrative_formatting(a_row):
+
+def period_separated_narrative_formatting(a_row, with_drug: bool = True) -> str:
     """
     Concatenates all the indicative columns into a single string for LLM consumption.
 
     Note:
-        - Fields 'q1.score', 'q2.score', 'q3.score', 'audit.c.score', 'person_id', and
-        'split' are ignored.
+        - Fields 'q1.score', 'q2.score', 'q3.score', 'audit.c.score', 'person_id',
+            'anxiety', 'fatigue', and 'split' are ignored.
         - Numerated concept_names and drug_exposure_start_dates are renamed for
             stylistic consistency.
         - Most recent drug use is closer to comorbidity.
@@ -49,6 +50,7 @@ def period_separated_narrative_formatting(a_row):
 
     Args:
         a_row: A row in dataframe.
+        with_drug: Whether to include drug information.
     Returns:
         A string of demographics, comorbidity, and drug use of a specific person.
     """
@@ -56,7 +58,7 @@ def period_separated_narrative_formatting(a_row):
     comorbidities = []
     drugs = []
     for k, v in a_row.items():
-        if k in ['q1.score', 'q2.score', 'q3.score',
+        if k in ['q1.score', 'q2.score', 'q3.score', 'anxiety', 'fatigue',
                  'audit.c.score', 'person_id', 'split']:
             continue
         elif k in ['gender', 'race', 'ethnicity', 'age']:
@@ -64,7 +66,8 @@ def period_separated_narrative_formatting(a_row):
         elif k == 'comorbidity':
             comorbidities.append(f'Comorbidity: {v}')
         elif k == 'standard_concept_name':
-            drugs.append(f'Recent drug: {v}.')
+            if with_drug:
+                drugs.append(f'Recent drug: {v}.')
         else:
             raise ValueError(f'Unknown key {k}')
     formatted_row = demographics + comorbidities + drugs
