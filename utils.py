@@ -59,7 +59,8 @@ def period_separated_narrative_formatting(a_row, with_drug: bool = True) -> str:
     comorbidities = []
     drugs = []
     for k, v in a_row.items():
-        if k in ['q1.score', 'q2.score', 'q3.score', 'anxiety', 'fatigue',
+        if k in ['q1.score', 'q2.score', 'q3.score',
+                 'anxiety', 'fatigue', 'empl_insurance_or_not',
                  'audit.c.score', 'person_id', 'split']:
             continue
         elif k in ['gender', 'race', 'ethnicity', 'age']:
