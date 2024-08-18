@@ -179,7 +179,6 @@ if __name__ == "__main__":
                               'q1.score', 'q2.score', 'q3.score', 'audit.c.score',
                               'fatigue', 'anxiety', 'type_2_diabetes', 'type_1_diabetes',
                               'other_unknown_diabetes', 'prediabetes'])
-        df = df.drop(columns=['empl.merge', 'non-empl.merge'])
     else:
         raise ValueError(f"Unknown target {args.target}")
 
