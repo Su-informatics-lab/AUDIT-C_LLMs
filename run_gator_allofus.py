@@ -173,7 +173,7 @@ if __name__ == "__main__":
         df = df[(df['empl.merge'] == 1) | (df['non-empl.merge'] == 1)]
         # create a new column 'insurance_type'
         # 0 indicates employer-based and 1 indicates non-employer-based
-        df['insurance_type'] = df['non-empl.merge'].astype(int)
+        df['empl_insurance_or_not'] = df['non-empl.merge'].astype(int)
         # drop the original 'empl.merge' and 'non-empl.merge' columns
         df = df.drop(columns=['empl.merge', 'non-empl.merge',
                               'q1.score', 'q2.score', 'q3.score', 'audit.c.score',
