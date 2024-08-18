@@ -19,7 +19,8 @@ from transformers import (AutoConfig, AutoModel, AutoTokenizer,
 
 from utils import (comorbidities_to_narrative, PROJECT_NAME, SEED,
                    compute_metrics, period_separated_narrative_formatting,
-                   DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_FAT_ANX_AUD_212K_RAW_PARQUET_PATH)
+                   DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_FAT_ANX_AUD_212K_RAW_PARQUET_PATH,
+                   DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_FAT_ANX_AUD_DIABETE_INSURANCE_212K_RAW_PARQUET_PATH)
 
 __author__ = "hw56@indiana.edu"
 __version__ = "0.0.1"
@@ -146,7 +147,7 @@ def preprocess_df_for_lm(df):
 if __name__ == "__main__":
     torch.manual_seed(SEED + 123565)
     parser = argparse.ArgumentParser(description="Train a GatorTron regression model for fatigue or anxiety prediction")
-    parser.add_argument("--target", type=str, choices=['fatigue', 'anxiety'])
+    parser.add_argument("--target", type=str, choices=['fatigue', 'anxiety', 'empl_insurance_or_not'])
     parser.add_argument("--with_drug", action='store_true', default=False,
                         help="if use drug data; set to False will only use demo + como")
     parser.add_argument("--non_linear_head", action='store_true', default=False, help="whether to use non-linear regression head")
@@ -157,13 +158,26 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     wandb.init(project=PROJECT_NAME, name=args.run_name)
+    if args.target in ['fatigue', 'anxiety']:
+        df = pd.read_parquet(
+            DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_FAT_ANX_AUD_212K_RAW_PARQUET_PATH)
+        # filter out nas
+        df = df[df[args.target] != 'PMI: Skip']
+        # encode target
+        df[args.target] = encode_severity(df, args.target, severity_mappings[args.target])
 
-    df = pd.read_parquet(
-        DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_FAT_ANX_AUD_212K_RAW_PARQUET_PATH)
-    # filter out nas
-    df = df[df[args.target] != 'PMI: Skip']
-    # encode target
-    df[args.target] = encode_severity(df, args.target, severity_mappings[args.target])
+    elif args.target == 'empl_insurance_or_not':
+        df = pd.read_parquet(
+            DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_FAT_ANX_AUD_DIABETE_INSURANCE_212K_RAW_PARQUET_PATH)
+        # filter out individuals without any insurance
+        df = df[(df['empl.merge'] == 1) | (df['non-empl.merge'] == 1)]
+        # create a new column 'insurance_type'
+        # 0 indicates employer-based and 1 indicates non-employer-based
+        df['insurance_type'] = df['non-empl.merge'].astype(int)
+        # drop the original 'empl.merge' and 'non-empl.merge' columns
+        df = df.drop(columns=['empl.merge', 'non-empl.merge'])
+    else:
+        raise ValueError(f"Unknown target {args.target}")
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
