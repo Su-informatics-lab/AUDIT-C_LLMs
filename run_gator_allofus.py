@@ -175,6 +175,10 @@ if __name__ == "__main__":
         # 0 indicates employer-based and 1 indicates non-employer-based
         df['insurance_type'] = df['non-empl.merge'].astype(int)
         # drop the original 'empl.merge' and 'non-empl.merge' columns
+        df = df.drop(columns=['empl.merge', 'non-empl.merge',
+                              'q1.score', 'q2.score', 'q3.score', 'audit.c.score',
+                              'fatigue', 'anxiety', 'type_2_diabetes', 'type_1_diabetes',
+                              'other_unknown_diabetes', 'prediabetes'])
         df = df.drop(columns=['empl.merge', 'non-empl.merge'])
     else:
         raise ValueError(f"Unknown target {args.target}")
