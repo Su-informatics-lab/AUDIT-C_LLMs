@@ -114,7 +114,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--run_name",
-        help="like 'gatortron_rgr_demo_como_threeDrug_linear_head'"
+        help="like 'gatortron_rgr_demo_como_halfyearDrug_linear_head'"
     )
     args = parser.parse_args()
 
