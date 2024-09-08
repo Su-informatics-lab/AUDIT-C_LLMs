@@ -34,11 +34,11 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class GatorTron_Dataset(Dataset):
-    def __init__(self, df, tokenizer, max_len=GATROTRON_MAX_LEN):
+    def __init__(self, df, tokenizer, with_drug, max_len=GATROTRON_MAX_LEN):
         self.df = df.reset_index(drop=True)  # drop index
         self.max_len = max_len
         self.texts = [
-            period_separated_narrative_formatting(row)
+            period_separated_narrative_formatting(row, with_drug)
             for _, row in self.df.iterrows()
         ]
         self.labels = [int(label) for label in self.df["audit.c.score"].tolist()]
@@ -113,8 +113,14 @@ if __name__ == "__main__":
         help="which model to use"
     )
     parser.add_argument(
+        "--with_drug",
+        action='store_true',
+        default=False,
+        help="whether to use date information"
+    )
+    parser.add_argument(
         "--run_name",
-        help="like 'gatortron_rgr_demo_como_halfyearDrug_linear_head'"
+        help="like 'gatortron_rgr_demo_como_withDrug_halfYearDrug_linear_head'"
     )
     args = parser.parse_args()
 
@@ -160,9 +166,9 @@ if __name__ == "__main__":
     val_df = preprocess_df_for_lm(df.loc[df.split == 'validation'])
     test_df = preprocess_df_for_lm(df.loc[df.split == 'test'])
 
-    train_dataset = GatorTron_Dataset(train_df, tokenizer)
-    eval_dataset = GatorTron_Dataset(val_df, tokenizer)
-    test_dataset = GatorTron_Dataset(test_df, tokenizer)
+    train_dataset = GatorTron_Dataset(train_df, tokenizer, args.with_drug)
+    eval_dataset = GatorTron_Dataset(val_df, tokenizer, args.with_drug)
+    test_dataset = GatorTron_Dataset(test_df, tokenizer, args.with_drug)
 
     # init model
     config = AutoConfig.from_pretrained(args.model_name, num_labels=1)  # for regression
