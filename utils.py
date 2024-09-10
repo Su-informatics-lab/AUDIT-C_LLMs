@@ -10,7 +10,10 @@ DEMO_COMO_THREE_DRUG_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febe
 DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_212K_RAW_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_DEMO_ExpComo_PipeSep_HalfYearDrug_212K.parquet'
 FATIGUE_ANXIETY = "gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/bq_exports/xiongc@researchallofus.org/20240801/survey_27943846/survey_27943846_*.csv"
 DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_FAT_ANX_AUD_212K_RAW_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_DEMO_ExpComo_PipeSep_HalfYearDrug_fatigue_anxiety_auditc_212K.parquet'
+# the single source of truth
 DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_FAT_ANX_AUD_DIABETE_INSURANCE_212K_RAW_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_DEMO_ExpComo_PipeSep_HalfYearDrug_fatigue_anxiety_auditc_diabete_insurance_212K.parquet'
+# the single source of truth w/ drug columns expanded
+DEMO_EXPCOMO_EXPHALFYEARDRUG_FAT_ANX_AUD_DIABETE_INSURANCE_212K_RAW_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_DEMO_ExpComo_ExpHalfYearDrug_fatigue_anxiety_auditc_diabete_insurance_212K.parquet'
 MODEL_NAME = 'google/flan-t5-base'
 PROJECT_NAME = 'ALLOFUS'
 SEED = 6179
