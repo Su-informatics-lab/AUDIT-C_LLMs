@@ -1,6 +1,7 @@
 import argparse
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModel, AutoConfig
 from sklearn.decomposition import PCA
 import torch
@@ -67,7 +68,7 @@ def generate_drug_embeddings(
     texts = df[text_column].tolist()
 
     with torch.no_grad():
-        for i in range(0, len(texts), batch_size):
+        for i in tqdm(range(0, len(texts), batch_size), desc="Generating Embeddings"):
             batch_texts = texts[i:i + batch_size]
             encoding = tokenizer(
                 batch_texts,
