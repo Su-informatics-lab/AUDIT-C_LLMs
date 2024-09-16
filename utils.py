@@ -14,6 +14,9 @@ DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_FAT_ANX_AUD_212K_RAW_PARQUET_PATH = 'gs://fc-
 DEMO_EXPCOMO_PIPE_SEP_HALFYEARDRUG_FAT_ANX_AUD_DIABETE_INSURANCE_212K_RAW_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_DEMO_ExpComo_PipeSep_HalfYearDrug_fatigue_anxiety_auditc_diabete_insurance_212K.parquet'
 # the single source of truth w/ drug columns expanded
 DEMO_EXPCOMO_EXPHALFYEARDRUG_FAT_ANX_AUD_DIABETE_INSURANCE_212K_RAW_PARQUET_PATH = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUD_LLM_DEMO_ExpComo_ExpHalfYearDrug_fatigue_anxiety_auditc_diabete_insurance_212K.parquet'
+# audit-c 212k data, w/ pos_es, neg_es, and standard_concept_name (pipe concatenated)
+AUDIT_ML_PAQUET = 'gs://fc-secure-19ab668e-266f-4a5f-9c63-febea17b23cf/data/hw56/AUDIT_ML.parquet'
+
 MODEL_NAME = 'google/flan-t5-base'
 PROJECT_NAME = 'ALLOFUS'
 SEED = 6179
@@ -23,6 +26,18 @@ MAX_OUTPUT_LENGTH = 4
 HEAD = ("### Score the user's Alcohol Use Disorders Identification Test (AUDIT-C) "
         "from 0 to 12 based on the provided demographics and comorbidity data:\n")
 TAIL = "\n### AUDIT-C Score:"
+
+
+def format_drug_column(df, prefix='Recent drug: ', suffix='.'):
+    """
+    Format a column of pipe-separated drug use names into a readable string
+    format by replacing pipe separators with commas. Each formatted string starts
+    with a specified `prefix` and ends with a specified `suffix`.
+
+    """
+    df = df.copy()
+    df.loc[:, 'standard_concept_name'] = prefix + df['standard_concept_name'].str.replace(' | ', ', ') + suffix
+    return df
 
 
 def count_parameters(model: nn.Module) -> int:
