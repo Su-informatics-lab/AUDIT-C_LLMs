@@ -88,7 +88,7 @@ def generate_drug_embeddings(
                 # pooling: take the mean of the encoder outputs
                 pooled_output = last_hidden_state.mean(
                     dim=1)  # (batch_size, hidden_size)
-            elif model_type in ['bert', 'roberta', 'distilbert', 'albert']:
+            elif model_type in ['megatron-bert', 'bert', 'roberta', 'distilbert', 'albert']:
                 # for encoder models, use the [CLS] token embedding
                 outputs = model(input_ids=input_ids, attention_mask=attention_mask)
                 last_hidden_state = outputs.last_hidden_state  # (batch_size, seq_length, hidden_size)
