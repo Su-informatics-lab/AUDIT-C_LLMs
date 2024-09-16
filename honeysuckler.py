@@ -62,6 +62,8 @@ def generate_drug_embeddings(
     is_encoder_decoder = config.is_encoder_decoder
 
     embeddings = []
+    # replace missing values with an empty string and ensure all entries are strings
+    df[text_column] = df[text_column].fillna('None').astype(str)
     texts = df[text_column].tolist()
 
     with torch.no_grad():
