@@ -9,18 +9,21 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 from utils import SEED
+import os
 
 
 def generate_drug_embeddings(
         df: pd.DataFrame,
         text_column: str,
+        person_id_column: str,
         model_name: str = 'UFNLP/gatortron-base',
         embedding_dim: int = 32,
         batch_size: int = 32,
         random_state: int = 42,
         reduction_method: str = 'pca',  # options: 'pca' or 'autoencoder'
-        device: str = None
-) -> pd.DataFrame:
+        device: str = None,
+        cache_file: str = None
+    ) -> pd.DataFrame:
     """
     Generate embeddings from drug use text data using a specified language model and
     reduce dimensionality using PCA or an autoencoder.
@@ -28,94 +31,141 @@ def generate_drug_embeddings(
     Parameters:
         df: pandas DataFrame containing the data.
         text_column: Name of the column containing the drug use text.
+        person_id_column: Name of the column containing the unique identifier (e.g., 'person_id').
         model_name: Name of the Hugging Face model to use.
         embedding_dim: Desired dimension for the output embeddings.
         batch_size: Batch size for processing data.
         random_state: Seed for reproducibility.
         reduction_method: Method for dimensionality reduction ('pca' or 'autoencoder').
         device: Device to run the model on ('cpu' or 'cuda'). If None, automatically
-        selects GPU if available.
+            selects GPU if available.
+        cache_file: Path to the cache file storing raw embeddings.
 
     Returns:
-        A df containing the reduced embeddings.
+        A DataFrame containing the reduced embeddings, indexed by person_id.
     """
-    # sanity check
+    # sanity checks
     if text_column not in df.columns:
         raise ValueError(f"Column '{text_column}' not found in the DataFrame.")
+    if person_id_column not in df.columns:
+        raise ValueError(f"Column '{person_id_column}' not found in the DataFrame.")
 
     # set device
     if device is None:
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    # load tokenizer and model
-    try:
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        config = AutoConfig.from_pretrained(model_name)
-        model = AutoModel.from_pretrained(model_name, config=config)
-    except Exception as e:
-        raise ValueError(f"Error loading model '{model_name}': {e}")
+    # prepare the cache
+    cache_exists = cache_file is not None and os.path.exists(cache_file)
+    if cache_exists:
+        cached_embeddings = pd.read_parquet(cache_file)
+        cached_person_ids = set(cached_embeddings.index)
+    else:
+        cached_embeddings = pd.DataFrame()
+        cached_person_ids = set()
 
-    model.to(device)
-    model.eval()
+    # identify person_ids needing embeddings
+    all_person_ids = set(df[person_id_column])
+    person_ids_to_compute = all_person_ids - cached_person_ids
 
-    # identify model type
-    model_type = config.model_type
-    is_encoder_decoder = config.is_encoder_decoder
+    # prepare data for embedding generation
+    df_to_embed = df[df[person_id_column].isin(person_ids_to_compute)].copy()
 
-    embeddings = []
-    # replace missing values with an empty string and ensure all entries are strings
-    df[text_column] = df[text_column].fillna('None').astype(str)
-    texts = df[text_column].tolist()
+    # replace missing values with a placeholder and ensure all entries are strings
+    df_to_embed[text_column] = df_to_embed[text_column].fillna('no_drug').astype(str)
+    texts = df_to_embed[text_column].tolist()
+    person_ids = df_to_embed[person_id_column].tolist()
 
-    with torch.no_grad():
-        for i in tqdm(range(0, len(texts), batch_size), desc="Generating Embeddings"):
-            batch_texts = texts[i:i + batch_size]
-            encoding = tokenizer(
-                batch_texts,
-                padding=True,
-                truncation=True,
-                max_length=512,
-                return_tensors='pt'
-            )
-            input_ids = encoding['input_ids'].to(device)
-            attention_mask = encoding['attention_mask'].to(device)
+    # load tokenizer and model if needed
+    if person_ids_to_compute:
+        # load tokenizer and model
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            config = AutoConfig.from_pretrained(model_name)
+            model = AutoModel.from_pretrained(model_name, config=config)
+        except Exception as e:
+            raise ValueError(f"Error loading model '{model_name}': {e}")
 
-            # get model outputs
-            if is_encoder_decoder:
-                # for encoder-decoder models, use encoder outputs
-                encoder_outputs = model.encoder(input_ids=input_ids,
-                                                attention_mask=attention_mask)
-                last_hidden_state = encoder_outputs.last_hidden_state  # (batch_size, seq_length, hidden_size)
-                # pooling: take the mean of the encoder outputs
-                pooled_output = last_hidden_state.mean(
-                    dim=1)  # (batch_size, hidden_size)
-            elif model_type in ['megatron-bert', 'bert', 'roberta', 'distilbert', 'albert']:
-                # for encoder models, use the [CLS] token embedding
-                outputs = model(input_ids=input_ids, attention_mask=attention_mask)
-                last_hidden_state = outputs.last_hidden_state  # (batch_size, seq_length, hidden_size)
-                pooled_output = last_hidden_state[:, 0, :]  # (batch_size, hidden_size)
-            elif model_type in ['gpt2', 'gpt', 'xlm']:
-                # for decoder-only models, use the last hidden state
-                outputs = model(input_ids=input_ids, attention_mask=attention_mask)
-                last_hidden_state = outputs.last_hidden_state  # (batch_size, seq_length, hidden_size)
-                # pooling: take the mean of the last hidden states
-                pooled_output = last_hidden_state.mean(
-                    dim=1)  # (batch_size, hidden_size)
-            else:
-                raise ValueError(f"Model type '{model_type}' is not supported.")
+        model.to(device)
+        model.eval()
 
-            embeddings.append(pooled_output.cpu().numpy())
+        # identify model type
+        model_type = config.model_type
+        is_encoder_decoder = config.is_encoder_decoder
 
-    # stack all embeddings
-    embeddings = np.concatenate(embeddings, axis=0)  # (num_samples, hidden_size)
+        # generate embeddings
+        embeddings = []
+        with torch.no_grad():
+            for i in tqdm(range(0, len(texts), batch_size), desc="Generating Embeddings"):
+                batch_texts = texts[i:i + batch_size]
+                encoding = tokenizer(
+                    batch_texts,
+                    padding=True,
+                    truncation=True,
+                    max_length=512,
+                    return_tensors='pt'
+                )
+                input_ids = encoding['input_ids'].to(device)
+                attention_mask = encoding['attention_mask'].to(device)
+
+                # get model outputs
+                if is_encoder_decoder:
+                    # for encoder-decoder models, use encoder outputs
+                    encoder_outputs = model.encoder(input_ids=input_ids,
+                                                    attention_mask=attention_mask)
+                    last_hidden_state = encoder_outputs.last_hidden_state  # (batch_size, seq_length, hidden_size)
+                    # pooling: take the mean of the encoder outputs
+                    pooled_output = last_hidden_state.mean(dim=1)  # (batch_size, hidden_size)
+                elif model_type in ['megatron-bert', 'bert', 'roberta', 'distilbert', 'albert']:
+                    # for encoder models, use the [CLS] token embedding
+                    outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+                    last_hidden_state = outputs.last_hidden_state  # (batch_size, seq_length, hidden_size)
+                    pooled_output = last_hidden_state[:, 0, :]  # (batch_size, hidden_size)
+                elif model_type in ['gpt2', 'gpt', 'xlm']:
+                    # for decoder-only models, use the last hidden state
+                    outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+                    last_hidden_state = outputs.last_hidden_state  # (batch_size, seq_length, hidden_size)
+                    # pooling: take the mean of the last hidden states
+                    pooled_output = last_hidden_state.mean(dim=1)  # (batch_size, hidden_size)
+                else:
+                    raise ValueError(f"Model type '{model_type}' is not supported.")
+
+                embeddings.append(pooled_output.cpu().numpy())
+
+        # stack all new embeddings
+        embeddings = np.concatenate(embeddings, axis=0)  # (num_new_samples, hidden_size)
+
+        # create DataFrame for new embeddings
+        embeddings_new_df = pd.DataFrame(
+            embeddings,
+            index=df_to_embed[person_id_column],
+            columns=[f'hidden_{i}' for i in range(embeddings.shape[1])]
+        )
+
+        # update the cache
+        if cache_file is not None:
+            # combine with cached embeddings
+            embeddings_raw_df = pd.concat([cached_embeddings, embeddings_new_df], axis=0)
+            # save updated cache
+            embeddings_raw_df.to_parquet(cache_file, index=True)
+            print(f"Cache updated at {cache_file}")
+        else:
+            embeddings_raw_df = embeddings_new_df
+    else:
+        # no new embeddings needed; use cache only
+        embeddings_raw_df = cached_embeddings
+
+    # ensure embeddings are aligned with df
+    embeddings_raw_df = embeddings_raw_df.loc[df[person_id_column]]
+
+    # proceed with dimensionality reduction
+    embeddings_array = embeddings_raw_df.values  # (num_samples, hidden_size)
 
     # dimensionality reduction: pca or autoencoder
     if reduction_method == 'pca':
         pca = PCA(n_components=embedding_dim, random_state=random_state)
-        embeddings_reduced = pca.fit_transform(
-            embeddings)  # (num_samples, embedding_dim)
+        embeddings_reduced = pca.fit_transform(embeddings_array)  # (num_samples, embedding_dim)
     elif reduction_method == 'autoencoder':
-        # define the autoencoder model
+        # Define the autoencoder model
         class Autoencoder(nn.Module):
             def __init__(self, input_dim, latent_dim):
                 super(Autoencoder, self).__init__()
@@ -135,16 +185,16 @@ def generate_drug_embeddings(
                 reconstructed = self.decoder(z)
                 return reconstructed, z
 
-        input_dim = embeddings.shape[1]
+        input_dim = embeddings_array.shape[1]
         latent_dim = embedding_dim
         autoencoder = Autoencoder(input_dim, latent_dim).to(device)
 
         # training parameters
-        num_epochs = 1000
+        num_epochs = 500
         learning_rate = 3e-4
 
         # prepare data
-        embeddings_tensor = torch.tensor(embeddings, dtype=torch.float32).to(device)
+        embeddings_tensor = torch.tensor(embeddings_array, dtype=torch.float32).to(device)
         dataset = torch.utils.data.TensorDataset(embeddings_tensor)
         dataloader = torch.utils.data.DataLoader(dataset,
                                                  batch_size=batch_size,
@@ -169,7 +219,6 @@ def generate_drug_embeddings(
 
         # obtain the reduced embeddings
         with torch.no_grad():
-            embeddings_tensor = torch.tensor(embeddings, dtype=torch.float32).to(device)
             _, embeddings_reduced = autoencoder(embeddings_tensor)
             embeddings_reduced = embeddings_reduced.cpu().numpy()
     else:
@@ -177,15 +226,18 @@ def generate_drug_embeddings(
             f"Reduction method '{reduction_method}' is not supported. "
             f"Choose 'pca' or 'autoencoder'.")
 
-    # create a DataFrame for the embeddings
+    # create a df for the embeddings
     embedding_columns = [f'embed_{i}' for i in range(embedding_dim)]
-    embeddings_df = pd.DataFrame(embeddings_reduced, columns=embedding_columns)
+    embeddings_df = pd.DataFrame(
+        embeddings_reduced,
+        columns=embedding_columns,
+        index=df[person_id_column]
+    )
 
-    # reset index to align with the original DataFrame
-    embeddings_df.index = df.index
+    # ensure embeddings_df index is aligned with df index
+    embeddings_df = embeddings_df.set_index(df.index)
 
     return embeddings_df
-
 
 if __name__ == "__main__":
     # set random seeds for reproducibility
@@ -205,6 +257,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--text_column", default='standard_concept_name', type=str,
         help="Name of the column containing the drug use text."
+    )
+    parser.add_argument(
+        "--person_id_column", default='person_id', type=str,
+        help="Name of the column containing the unique identifier."
     )
     parser.add_argument(
         "--model_name", default='UFNLP/gatortron-base', type=str,
@@ -232,6 +288,10 @@ if __name__ == "__main__":
         help="Device to run the model on ('cpu' or 'cuda'). If None, automatically "
              "selects GPU if available."
     )
+    parser.add_argument(
+        "--cache_file", default='embeddings/.gatortron_base_embed_cache.parquet', type=str,
+        help="Path to the cache file storing raw embeddings."
+    )
     args = parser.parse_args()
 
     # load the input data
@@ -241,11 +301,13 @@ if __name__ == "__main__":
     embeddings_df = generate_drug_embeddings(
         df=df,
         text_column=args.text_column,
+        person_id_column=args.person_id_column,
         model_name=args.model_name,
         embedding_dim=args.embedding_dim,
         batch_size=args.batch_size,
         reduction_method=args.reduction_method,
         device=args.device,
+        cache_file=args.cache_file,
         random_state=SEED
     )
 
