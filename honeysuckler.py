@@ -58,7 +58,13 @@ def generate_drug_embeddings(
     cache_exists = cache_file is not None and os.path.exists(cache_file)
     if cache_exists:
         cached_embeddings = pd.read_parquet(cache_file)
-        cached_person_ids = set(cached_embeddings[person_id_column])
+        if cached_embeddings.empty or person_id_column not in cached_embeddings.columns:
+            print(
+                f"Warning: '{person_id_column}' not found in cache file or cache is empty. Recomputing embeddings.")
+            cached_embeddings = pd.DataFrame()
+            cached_person_ids = set()
+        else:
+            cached_person_ids = set(cached_embeddings[person_id_column])
     else:
         cached_embeddings = pd.DataFrame()
         cached_person_ids = set()
