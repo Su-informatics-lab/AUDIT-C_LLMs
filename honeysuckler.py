@@ -25,24 +25,24 @@ def generate_drug_embeddings(
         cache_file: str = None
     ) -> pd.DataFrame:
     """
-    Generate embeddings from drug use text data using a specified language model and
+    generate embeddings from drug use text data using a specified language model and
     reduce dimensionality using PCA or an autoencoder.
 
-    Parameters:
+    parameters:
         df: pandas DataFrame containing the data.
-        text_column: Name of the column containing the drug use text.
-        person_id_column: Name of the column containing the unique identifier (e.g., 'person_id').
-        model_name: Name of the Hugging Face model to use.
-        embedding_dim: Desired dimension for the output embeddings.
-        batch_size: Batch size for processing data.
-        random_state: Seed for reproducibility.
-        reduction_method: Method for dimensionality reduction ('pca' or 'autoencoder').
-        device: Device to run the model on ('cpu' or 'cuda'). If None, automatically
+        text_column: name of the column containing the drug use text.
+        person_id_column: name of the column containing the unique identifier (e.g., 'person_id').
+        model_name: name of the Hugging Face model to use.
+        embedding_dim: desired dimension for the output embeddings.
+        batch_size: batch size for processing data.
+        random_state: seed for reproducibility.
+        reduction_method: method for dimensionality reduction ('pca' or 'autoencoder').
+        device: device to run the model on ('cpu' or 'cuda'). if None, automatically
             selects GPU if available.
-        cache_file: Path to the cache file storing raw embeddings.
+        cache_file: path to the cache file storing raw embeddings.
 
-    Returns:
-        A DataFrame containing the reduced embeddings, indexed by person_id.
+    returns:
+        a DataFrame containing the reduced embeddings, including 'person_id' as a column.
     """
     # sanity checks
     if text_column not in df.columns:
@@ -58,7 +58,7 @@ def generate_drug_embeddings(
     cache_exists = cache_file is not None and os.path.exists(cache_file)
     if cache_exists:
         cached_embeddings = pd.read_parquet(cache_file)
-        cached_person_ids = set(cached_embeddings.index)
+        cached_person_ids = set(cached_embeddings[person_id_column])
     else:
         cached_embeddings = pd.DataFrame()
         cached_person_ids = set()
@@ -137,16 +137,16 @@ def generate_drug_embeddings(
         # create DataFrame for new embeddings
         embeddings_new_df = pd.DataFrame(
             embeddings,
-            index=df_to_embed[person_id_column],
             columns=[f'hidden_{i}' for i in range(embeddings.shape[1])]
         )
+        embeddings_new_df[person_id_column] = df_to_embed[person_id_column].values
 
         # update the cache
         if cache_file is not None:
             # combine with cached embeddings
             embeddings_raw_df = pd.concat([cached_embeddings, embeddings_new_df], axis=0)
             # save updated cache
-            embeddings_raw_df.to_parquet(cache_file, index=True)
+            embeddings_raw_df.to_parquet(cache_file, index=False)
             print(f"Cache updated at {cache_file}")
         else:
             embeddings_raw_df = embeddings_new_df
@@ -155,10 +155,14 @@ def generate_drug_embeddings(
         embeddings_raw_df = cached_embeddings
 
     # ensure embeddings are aligned with df
-    embeddings_raw_df = embeddings_raw_df.loc[df[person_id_column]]
+    embeddings_raw_df = embeddings_raw_df.drop_duplicates(subset=[person_id_column])
+    embeddings_raw_df = embeddings_raw_df.set_index(person_id_column)
+    df = df.drop_duplicates(subset=[person_id_column])
+    df = df.set_index(person_id_column)
+    embeddings_raw_df = embeddings_raw_df.loc[df.index]
 
     # proceed with dimensionality reduction
-    embeddings_array = embeddings_raw_df.values  # (num_samples, hidden_size)
+    embeddings_array = embeddings_raw_df.filter(like='hidden_').values  # (num_samples, hidden_size)
 
     # dimensionality reduction: pca or autoencoder
     if reduction_method == 'pca':
@@ -276,16 +280,13 @@ def generate_drug_embeddings(
             f"Reduction method '{reduction_method}' is not supported. "
             f"Choose 'pca' or 'autoencoder'.")
 
-    # create a df for the embeddings
+    # create a DataFrame for the embeddings
     embedding_columns = [f'embed_{i}' for i in range(embedding_dim)]
     embeddings_df = pd.DataFrame(
         embeddings_reduced,
-        columns=embedding_columns,
-        index=df[person_id_column]
+        columns=embedding_columns
     )
-
-    # ensure embeddings_df index is aligned with df index
-    embeddings_df = embeddings_df.set_index(df.index)
+    embeddings_df[person_id_column] = df.index.values
 
     return embeddings_df
 
@@ -298,50 +299,50 @@ if __name__ == "__main__":
         torch.cuda.manual_seed_all(SEED)
 
     parser = argparse.ArgumentParser(
-        description="Produce drug vectors for downstream tasks"
+        description="produce drug vectors for downstream tasks"
     )
     parser.add_argument(
         "--input_file", required=True, type=str,
-        help="Path to the input parquet containing the drug use text data."
+        help="path to the input parquet containing the drug use text data."
     )
     parser.add_argument(
         "--text_column", default='standard_concept_name', type=str,
-        help="Name of the column containing the drug use text."
+        help="name of the column containing the drug use text."
     )
     parser.add_argument(
         "--person_id_column", default='person_id', type=str,
-        help="Name of the column containing the unique identifier."
+        help="name of the column containing the unique identifier."
     )
     parser.add_argument(
         "--model_name", default='UFNLP/gatortron-base', type=str,
-        help="Name of the Hugging Face model to use."
+        help="name of the Hugging Face model to use."
     )
     parser.add_argument(
         "--embedding_dim", default=32, type=int,
-        help="Desired dimension for the output embeddings."
+        help="desired dimension for the output embeddings."
     )
     parser.add_argument(
         "--batch_size", default=32, type=int,
-        help="Batch size for processing data."
+        help="batch size for processing data."
     )
     parser.add_argument(
         "--reduction_method",
         default='pca', choices=['pca', 'autoencoder'], type=str,
-        help="Method for dimensionality reduction ('pca' or 'autoencoder')."
+        help="method for dimensionality reduction ('pca' or 'autoencoder')."
     )
     parser.add_argument(
         "--output_file", required=True, type=str,
-        help="Path to save the output embeddings file (Parquet format)."
+        help="path to save the output embeddings file (Parquet format)."
     )
     parser.add_argument(
         "--device", default=None, type=str,
-        help="Device to run the model on ('cpu' or 'cuda'). If None, automatically "
+        help="device to run the model on ('cpu' or 'cuda'). if None, automatically "
              "selects GPU if available."
     )
     parser.add_argument(
         "--cache_file",
         default='embeddings/.gatortron_base_embed_cache.parquet', type=str,
-        help="Path to the cache file storing raw embeddings."
+        help="path to the cache file storing raw embeddings."
     )
     args = parser.parse_args()
 
@@ -362,6 +363,6 @@ if __name__ == "__main__":
         random_state=SEED
     )
 
-    # save the embeddings to a Parquet file, keeping the original index
-    embeddings_df.to_parquet(args.output_file, index=True)
+    # save the embeddings to a Parquet file, including 'person_id' as a column
+    embeddings_df.to_parquet(args.output_file, index=False)
     print(f"Embeddings saved to {args.output_file}")
