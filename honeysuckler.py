@@ -4,13 +4,13 @@ import numpy as np
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModel, AutoConfig
 from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import random
 from utils import SEED
 import os
-
 
 def generate_drug_embeddings(
         df: pd.DataFrame,
@@ -192,20 +192,42 @@ def generate_drug_embeddings(
         # training parameters
         num_epochs = 500
         learning_rate = 3e-4
+        patience = 10  # for early stopping
 
-        # prepare data
-        embeddings_tensor = torch.tensor(embeddings_array, dtype=torch.float32).to(device)
-        dataset = torch.utils.data.TensorDataset(embeddings_tensor)
-        dataloader = torch.utils.data.DataLoader(dataset,
+        # split data into training and validation sets
+        X_train, X_val = train_test_split(
+            embeddings_array,
+            test_size=0.2,
+            random_state=random_state
+        )
+
+        # prepare data loaders
+        train_tensor = torch.tensor(X_train, dtype=torch.float32).to(device)
+        val_tensor = torch.tensor(X_val, dtype=torch.float32).to(device)
+
+        train_dataset = torch.utils.data.TensorDataset(train_tensor)
+        val_dataset = torch.utils.data.TensorDataset(val_tensor)
+
+        train_loader = torch.utils.data.DataLoader(train_dataset,
+                                                   batch_size=batch_size,
+                                                   shuffle=True)
+        val_loader = torch.utils.data.DataLoader(val_dataset,
                                                  batch_size=batch_size,
-                                                 shuffle=True)
+                                                 shuffle=False)
+
         criterion = nn.MSELoss()
         optimizer = optim.Adam(autoencoder.parameters(), lr=learning_rate)
 
-        # training loop
+        # early stopping variables
+        best_val_loss = float('inf')
+        epochs_no_improve = 0
+        best_model_state = None
+
+        # training loop with early stopping
         for epoch in range(num_epochs):
+            autoencoder.train()
             total_loss = 0
-            for data_batch in dataloader:
+            for data_batch in train_loader:
                 inputs = data_batch[0]
                 optimizer.zero_grad()
                 reconstructed, _ = autoencoder(inputs)
@@ -213,12 +235,40 @@ def generate_drug_embeddings(
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item() * inputs.size(0)
-            avg_loss = total_loss / len(dataloader.dataset)
-            # print loss per epoch
-            print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.4f}")
+            avg_train_loss = total_loss / len(train_loader.dataset)
+
+            # validation
+            autoencoder.eval()
+            val_loss = 0
+            with torch.no_grad():
+                for data_batch in val_loader:
+                    inputs = data_batch[0]
+                    reconstructed, _ = autoencoder(inputs)
+                    loss = criterion(reconstructed, inputs)
+                    val_loss += loss.item() * inputs.size(0)
+            avg_val_loss = val_loss / len(val_loader.dataset)
+
+            # check for improvement
+            if avg_val_loss < best_val_loss:
+                best_val_loss = avg_val_loss
+                epochs_no_improve = 0
+                best_model_state = autoencoder.state_dict()
+            else:
+                epochs_no_improve += 1
+
+            # early stopping
+            if epochs_no_improve >= patience:
+                print(f"Early stopping at epoch {epoch+1}")
+                break
+            print(f"Epoch [{epoch+1}/{num_epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+
+        # load the best model
+        autoencoder.load_state_dict(best_model_state)
 
         # obtain the reduced embeddings
+        autoencoder.eval()
         with torch.no_grad():
+            embeddings_tensor = torch.tensor(embeddings_array, dtype=torch.float32).to(device)
             _, embeddings_reduced = autoencoder(embeddings_tensor)
             embeddings_reduced = embeddings_reduced.cpu().numpy()
     else:
