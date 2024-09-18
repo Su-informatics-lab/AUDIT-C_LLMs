@@ -339,7 +339,8 @@ if __name__ == "__main__":
              "selects GPU if available."
     )
     parser.add_argument(
-        "--cache_file", default='embeddings/.gatortron_base_embed_cache.parquet', type=str,
+        "--cache_file",
+        default='embeddings/.gatortron_base_embed_cache.parquet', type=str,
         help="Path to the cache file storing raw embeddings."
     )
     args = parser.parse_args()
