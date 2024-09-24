@@ -1,16 +1,20 @@
 import argparse
-import pandas as pd
+import os
+import random
+
 import numpy as np
-from tqdm import tqdm
-from transformers import AutoTokenizer, AutoModel, AutoConfig
-from sklearn.decomposition import PCA
-from sklearn.model_selection import train_test_split
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import random
+from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
+from transformers import AutoConfig, AutoModel, AutoTokenizer
+from umap import UMAP
+
 from utils import SEED
-import os
+
 
 def generate_drug_embeddings(
         df: pd.DataFrame,
@@ -20,15 +24,15 @@ def generate_drug_embeddings(
         embedding_dim: int = 32,
         batch_size: int = 32,
         random_state: int = 42,
-        reduction_method: str = 'pca',  # options: 'pca' or 'autoencoder'
+        reduction_method: str = 'pca',  # options: 'pca', 'autoencoder', or 'umap'
         device: str = None,
         cache_file: str = None
     ) -> pd.DataFrame:
     """
-    generate embeddings from drug use text data using a specified language model and
-    reduce dimensionality using PCA or an autoencoder.
+    Generate embeddings from drug use text data using a specified language model and
+    reduce dimensionality using PCA, UMAP, or an autoencoder.
 
-    parameters:
+    Parameters:
         df: pandas DataFrame containing the data.
         text_column: name of the column containing the drug use text.
         person_id_column: name of the column containing the unique identifier (e.g., 'person_id').
@@ -41,8 +45,8 @@ def generate_drug_embeddings(
             selects GPU if available.
         cache_file: path to the cache file storing raw embeddings.
 
-    returns:
-        a DataFrame containing the reduced embeddings, including 'person_id' as a column.
+    Returns:
+        A DataFrame containing the reduced embeddings, including 'person_id' as a column.
     """
     # sanity checks
     if text_column not in df.columns:
@@ -170,10 +174,19 @@ def generate_drug_embeddings(
     # proceed with dimensionality reduction
     embeddings_array = embeddings_raw_df.filter(like='hidden_').values  # (num_samples, hidden_size)
 
-    # dimensionality reduction: pca or autoencoder
+    # dimensionality reduction: pca, umap, or autoencoder
     if reduction_method == 'pca':
         pca = PCA(n_components=embedding_dim, random_state=random_state)
         embeddings_reduced = pca.fit_transform(embeddings_array)  # (num_samples, embedding_dim)
+
+    elif reduction_method == 'umap':
+        umap_reducer = UMAP(  # fixme: can be suboptimal
+            n_components=embedding_dim,
+            n_neighbors=15,
+            min_dist=0.1,
+            random_state=random_state)
+
+        embeddings_reduced = umap_reducer.fit_transform(embeddings_array)  # (num_samples, embedding_dim)
     elif reduction_method == 'autoencoder':
         # Define the autoencoder model
         class Autoencoder(nn.Module):
@@ -284,7 +297,7 @@ def generate_drug_embeddings(
     else:
         raise ValueError(
             f"Reduction method '{reduction_method}' is not supported. "
-            f"Choose 'pca' or 'autoencoder'.")
+            f"Choose 'pca', 'umap', or 'autoencoder'.")
 
     # create a DataFrame for the embeddings
     embedding_columns = [f'embed_{i}' for i in range(embedding_dim)]
@@ -333,8 +346,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--reduction_method",
-        default='pca', choices=['pca', 'autoencoder'], type=str,
-        help="method for dimensionality reduction ('pca' or 'autoencoder')."
+        default='pca', choices=['pca', 'umap', 'autoencoder'], type=str,
+        help="method for dimensionality reduction ('pca', 'umap', or 'autoencoder')."
     )
     parser.add_argument(
         "--output_file", required=True, type=str,
